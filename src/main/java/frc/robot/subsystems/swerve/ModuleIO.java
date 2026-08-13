@@ -3,8 +3,8 @@ package frc.robot.subsystems.swerve;
 import org.littletonrobotics.junction.AutoLog;
 import edu.wpi.first.math.geometry.Rotation2d;
 import frc.robot.subsystems.swerve.DriveSubsystem.SwerveModule;
-import frc.robot.util.ComponentStatus.EncoderHealth;
-import frc.robot.util.ComponentStatus.MotorControlMode;
+import frc.robot.util.Hardware.EncoderHealth;
+import frc.robot.util.Hardware.MotorControlMode;
 import frc.robot.util.PIDConstants;
 
 public interface ModuleIO {

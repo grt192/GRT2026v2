@@ -4,7 +4,7 @@ import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import frc.robot.commands.AutonShooterSequence;
 import frc.robot.subsystems.hopper.HopperSubsystem;
 import frc.robot.subsystems.intake.pivot.PivotSubsystem;
-import frc.robot.subsystems.intake.roller.RollerSubsystem;
+import frc.robot.subsystems.intake.roller.IntakeRollerSubsystem;
 import frc.robot.subsystems.shooter.hood.HoodSubsystem;
 import frc.robot.subsystems.shooter.tower.TowerSubsystem;
 import frc.robot.subsystems.shooter.flywheel.FlywheelSubsystem;
@@ -19,7 +19,7 @@ public class ShootAndLeaveAuton extends SequentialCommandGroup {
         HopperSubsystem hopperSubsystem,
         TowerSubsystem towerSubsystem,
         PivotSubsystem pivot,
-        RollerSubsystem roller) {
+        IntakeRollerSubsystem roller) {
         addCommands(
             new AutonShooterSequence(
                 flySubsystem,

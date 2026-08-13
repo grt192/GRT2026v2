@@ -169,6 +169,19 @@
                                    may only be represented as '{}' when not part of a
                                    multi-block statement (4.1.3)"/>
     </module>
+    <!-- MechanismConfig.fx() is a Phoenix type. Keeping it out of the template layer is what
+         stops the subsystem base classes from quietly becoming Phoenix-only, which is the exact
+         way this abstraction has been observed to rot elsewhere. Allowed only in the vendor IO
+         package, in per-subsystem *Config classes, and in MechanismConfig's own derived
+         accessors - see docs/subsystem-library-design.md section 7.3. -->
+    <module name="RegexpSinglelineJava">
+      <property name="id" value="NoVendorConfigOutsideVendorLayer"/>
+      <property name="format" value="\bconfig\.fx\(\)|\bconf\.fx\(\)"/>
+      <property name="message" value="config.fx() is Phoenix-specific: read it only in
+                                   util/subsystems/talonfx, in a *Config class, or through a
+                                   derived accessor on MechanismConfig
+                                   (docs/subsystem-library-design.md 7.3)"/>
+    </module>
     <module name="OneStatementPerLine">
       <message key="multiple.statements.line"
                value="Put each statement on its own line."/>

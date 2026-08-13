@@ -3,7 +3,8 @@ package frc.robot.commands.shooter.tower;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystems.shooter.tower.TowerSubsystem;
 import frc.robot.Constants.SmashAndShootConstants;
-import frc.robot.Constants.TowerConstants.TowerIntake;
+import frc.robot.subsystems.shooter.tower.TowerConfig.TowerIntake;
+import frc.robot.subsystems.shooter.tower.TowerConfig;
 
 public class TowerRoll extends Command {
 

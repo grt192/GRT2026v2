@@ -3,7 +3,7 @@ package frc.robot.util;
 import java.util.EnumMap;
 import java.util.Map;
 import org.littletonrobotics.junction.Logger;
-import frc.robot.util.ComponentStatus.MotorControlMode;
+import frc.robot.util.Hardware.MotorControlMode;
 
 public class LoggedSetpointTracker {
     private final Map<MotorControlMode, Double> setpoints = new EnumMap<>(MotorControlMode.class);

@@ -104,6 +104,8 @@ checkstyle {
     configFile = file("config/checkstyle/google_checks.xml")
     configProperties = [
         "org.checkstyle.google.severity": "error",
+        "org.checkstyle.google.suppressionfilter.config":
+            "${projectDir}/config/checkstyle/checkstyle-suppressions.xml",
     ]
     maxWarnings = 0
 }

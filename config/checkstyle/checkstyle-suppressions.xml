@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+  <!-- The vendor IO layer exists to speak Phoenix. -->
+  <suppress id="NoVendorConfigOutsideVendorLayer"
+            files="[\\/]util[\\/]subsystems[\\/]talonfx[\\/].*\.java"/>
+
+  <!-- Per-subsystem configs are where device settings are authored. -->
+  <suppress id="NoVendorConfigOutsideVendorLayer"
+            files=".*Config\.java"/>
+
+  <!-- Tests that pin the device configuration have to be able to read it. -->
+  <suppress id="NoVendorConfigOutsideVendorLayer"
+            files="[\\/]src[\\/]test[\\/].*\.java"/>
+</suppressions>

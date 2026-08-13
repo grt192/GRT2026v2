@@ -1,14 +1,14 @@
 package frc.robot.commands;
 
 import edu.wpi.first.wpilibj2.command.Command;
-import frc.robot.Constants.IntakeConstants;
-import frc.robot.Constants.ShooterConstants;
 import frc.robot.Constants.SmashAndShootConstants;
 import frc.robot.subsystems.hopper.HopperSubsystem;
+import frc.robot.subsystems.intake.pivot.IntakePivotConfig;
 import frc.robot.subsystems.intake.pivot.PivotSubsystem;
 import frc.robot.subsystems.shooter.hood.HoodSubsystem;
 import frc.robot.subsystems.shooter.tower.TowerSubsystem;
 import frc.robot.subsystems.shooter.flywheel.FlywheelSubsystem;
+import frc.robot.subsystems.shooter.hood.HoodConfig;
 
 /**
  * Manual shooter sequence - no auto-aim.
@@ -41,16 +41,16 @@ public class AutonShooterSequence extends Command {
     @Override
     public void initialize() {
         // Start ramping FlywheelSubsystem and moving hood to position
-        flywheel.setVelocity(SmashAndShootConstants.FLYWHEEL_VELO_RPS);
-        hood.setPosition(SmashAndShootConstants.HOOD_POSITION_ROT);
-        pivot.setPosition(IntakeConstants.PIVOT_IN_POS_ROT);
+        flywheel.setVelocityRps(SmashAndShootConstants.FLYWHEEL_VELO_RPS);
+        hood.setPositionRot(SmashAndShootConstants.HOOD_POSITION_ROT);
+        pivot.setPositionRot(IntakePivotConfig.IN_POS_ROT);
     }
 
     @Override
     public void execute() {
         // Keep commanding FlywheelSubsystem and hood targets
-        flywheel.setVelocity(SmashAndShootConstants.FLYWHEEL_VELO_RPS);
-        hood.setPosition(SmashAndShootConstants.HOOD_POSITION_ROT);
+        flywheel.setVelocityRps(SmashAndShootConstants.FLYWHEEL_VELO_RPS);
+        hood.setPositionRot(SmashAndShootConstants.HOOD_POSITION_ROT);
 
         // Only feed balls when FlywheelSubsystem is at speed AND hood is at position
         if (/* fly.wantedVel() && hd.wantedAngl() */ true) {
@@ -60,7 +60,7 @@ public class AutonShooterSequence extends Command {
             tower.stop();
             hopper.stop();
         }
-        pivot.setPosition(IntakeConstants.PIVOT_IN_POS_ROT);
+        pivot.setPositionRot(IntakePivotConfig.IN_POS_ROT);
     }
 
     @Override
@@ -71,7 +71,7 @@ public class AutonShooterSequence extends Command {
     @Override
     public void end(boolean interrupted) {
         flywheel.stop();
-        hood.setPosition(ShooterConstants.Hood.LOWER_ANGLE_LIMIT_ROT);
+        hood.setPositionRot(HoodConfig.LOWER_LIMIT_ROT);
         tower.stop();
         hopper.stop();
     }

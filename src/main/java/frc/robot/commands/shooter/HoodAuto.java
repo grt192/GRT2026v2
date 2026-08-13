@@ -54,7 +54,7 @@ public class HoodAuto extends Command {
         }
 
         System.out.println("hood angle: " + angleRot);
-        hood.setPosition(angleRot);
+        hood.setPositionRot(angleRot);
 
     }
 

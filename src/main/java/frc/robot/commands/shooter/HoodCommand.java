@@ -18,7 +18,7 @@ public class HoodCommand extends Command {
 
     @Override
     public void execute() {
-        hood.setPosition(SmashAndShootConstants.HOOD_POSITION_ROT);
+        hood.setPositionRot(SmashAndShootConstants.HOOD_POSITION_ROT);
     }
 
     @Override

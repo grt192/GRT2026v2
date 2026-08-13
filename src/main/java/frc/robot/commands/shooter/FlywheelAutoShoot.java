@@ -58,7 +58,7 @@ public class FlywheelAutoShoot extends Command {
             }
         }
 
-        fly.setVelocity(rps + offsetEntry.getDouble(0.0));
+        fly.setVelocityRps(rps + offsetEntry.getDouble(0.0));
     }
 
     @Override

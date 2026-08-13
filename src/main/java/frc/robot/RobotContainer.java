@@ -24,7 +24,6 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.CANType;
 import frc.robot.Constants.CycleShooterConstants;
 import frc.robot.Constants.Mode;
-import frc.robot.Constants.ShooterConstants.Flywheel;
 import frc.robot.commands.AutonShooterSequence;
 import frc.robot.commands.CycleShot;
 import frc.robot.commands.SmashShot;
@@ -34,35 +33,18 @@ import frc.robot.commands.auton.ShootAndLeaveAuton;
 import frc.robot.commands.intake.PivotAndRollerIntakeCommand;
 import frc.robot.controllers.PS5DriveController;
 import frc.robot.subsystems.fms.FieldManagementSubsystem;
-import frc.robot.subsystems.hopper.HopperIO;
-import frc.robot.subsystems.hopper.HopperIOTalonFX;
-import frc.robot.subsystems.hopper.HopperIOTalonFXSim;
 import frc.robot.subsystems.hopper.HopperSubsystem;
-import frc.robot.subsystems.intake.pivot.PivotIO;
-import frc.robot.subsystems.intake.pivot.PivotIOTalonFX;
-import frc.robot.subsystems.intake.pivot.PivotIOTalonFXSim;
 import frc.robot.subsystems.intake.pivot.PivotSubsystem;
-import frc.robot.subsystems.intake.roller.RollerIO;
-import frc.robot.subsystems.intake.roller.RollerIOTalonFX;
-import frc.robot.subsystems.intake.roller.RollerIOTalonFXSim;
-import frc.robot.subsystems.intake.roller.RollerSubsystem;
-import frc.robot.subsystems.shooter.hood.HoodIO;
-import frc.robot.subsystems.shooter.hood.HoodIOTalonFX;
-import frc.robot.subsystems.shooter.hood.HoodIOTalonFXSim;
+import frc.robot.subsystems.intake.roller.IntakeRollerSubsystem;
 import frc.robot.subsystems.shooter.hood.HoodSubsystem;
-import frc.robot.subsystems.shooter.flywheel.FlywheelIO;
-import frc.robot.subsystems.shooter.flywheel.FlywheelIOTalonFX;
-import frc.robot.subsystems.shooter.flywheel.FlywheelIOTalonFXSim;
+import frc.robot.subsystems.shooter.flywheel.FlywheelConfig;
 import frc.robot.subsystems.shooter.flywheel.FlywheelSubsystem;
-import frc.robot.subsystems.shooter.tower.TowerIO;
-import frc.robot.subsystems.shooter.tower.TowerIOTalonFX;
-import frc.robot.subsystems.shooter.tower.TowerIOTalonFXSim;
 import frc.robot.subsystems.shooter.tower.TowerSubsystem;
 import frc.robot.subsystems.swerve.AimSubsystem;
 import frc.robot.subsystems.swerve.SwerveSubsystem;
 import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionSubsystem;
-import frc.robot.util.LoggedCanivore;
+import frc.robot.util.CanBuses;
 import frc.robot.util.PS5ControllerEmulator;
 import frc.robot.util.TracerSentinel;
 import java.util.function.DoubleSupplier;
@@ -88,19 +70,17 @@ public class RobotContainer {
     private final SendableChooser<Command> autoChooser = new SendableChooser<>();
     private PS5DriveController driveController;
     private CommandPS5Controller mechController;
-    private final LoggedCanivore swerveCan = new LoggedCanivore(CANType.SWERVE);
-    private final LoggedCanivore mechCan = new LoggedCanivore(CANType.MECH);
 
-    private SwerveSubsystem swerveSubsystem = Constants.SWERVE_ENABLED ? new SwerveSubsystem(swerveCan) : null;
+    private SwerveSubsystem swerveSubsystem = Constants.SWERVE_ENABLED ? new SwerveSubsystem(CanBuses.of(CANType.SWERVE)) : null;
     private final FieldManagementSubsystem fmsSubsystem = new FieldManagementSubsystem(cycleFlywheelOffsetGetter);
     private final Field2d field = new Field2d();
 
-    private final PivotSubsystem pivot;
-    private final RollerSubsystem roller;
-    private final HopperSubsystem hopper;
-    private final TowerSubsystem tower;
-    private final FlywheelSubsystem flywheel;
-    private final HoodSubsystem hood;
+    private final PivotSubsystem pivot = new PivotSubsystem();
+    private final IntakeRollerSubsystem roller = new IntakeRollerSubsystem();
+    private final HopperSubsystem hopper = new HopperSubsystem();
+    private final TowerSubsystem tower = new TowerSubsystem();
+    private final FlywheelSubsystem flywheel = new FlywheelSubsystem();
+    private final HoodSubsystem hood = new HoodSubsystem();
     @SuppressWarnings("unused")
     private final AimSubsystem aimSubsystem =
         (Constants.SWERVE_ENABLED && swerveSubsystem != null)
@@ -132,33 +112,6 @@ public class RobotContainer {
      * The container for the robot. Contains subsystems, OI devices, and commands.
      */
     public RobotContainer() {
-        switch (Constants.CURRENT_MODE) {
-            case REAL:
-                pivot = new PivotSubsystem(new PivotIOTalonFX(mechCan));
-                roller = new RollerSubsystem(new RollerIOTalonFX(mechCan));
-                hopper = new HopperSubsystem(new HopperIOTalonFX(mechCan));
-                tower = new TowerSubsystem(new TowerIOTalonFX(mechCan));
-                flywheel = new FlywheelSubsystem(new FlywheelIOTalonFX(mechCan));
-                hood = new HoodSubsystem(new HoodIOTalonFX(mechCan));
-                break;
-            case SIM:
-                pivot = new PivotSubsystem(new PivotIOTalonFXSim(mechCan));
-                roller = new RollerSubsystem(new RollerIOTalonFXSim(mechCan));
-                hopper = new HopperSubsystem(new HopperIOTalonFXSim(mechCan));
-                tower = new TowerSubsystem(new TowerIOTalonFXSim(mechCan));
-                flywheel = new FlywheelSubsystem(new FlywheelIOTalonFXSim(mechCan));
-                hood = new HoodSubsystem(new HoodIOTalonFXSim(mechCan));
-                break;
-            case REPLAY:
-            default:
-                pivot = new PivotSubsystem(new PivotIO() {});
-                roller = new RollerSubsystem(new RollerIO() {});
-                hopper = new HopperSubsystem(new HopperIO() {});
-                tower = new TowerSubsystem(new TowerIO() {});
-                flywheel = new FlywheelSubsystem(new FlywheelIO() {});
-                hood = new HoodSubsystem(new HoodIO() {});
-                break;
-        }
         visionStuff();
         constructController();
         configureBindings();
@@ -359,7 +312,7 @@ public class RobotContainer {
 
                 // Closed loop holding 0 fights the flywheel, so stop it outright instead
                 if (Math.abs(flywheelManualVeloCommand) > 1e-6) {
-                    flywheel.setVelocity(flywheelManualVeloCommand);
+                    flywheel.setVelocityRps(flywheelManualVeloCommand);
                 } else {
                     flywheel.stop();
                 }
@@ -386,7 +339,7 @@ public class RobotContainer {
             }, hood));
 
             mechController.povUp().onTrue(Commands.runOnce(() -> {
-                if (Flywheel.FLYWHEEL_MAX_SPEED_RPS > cycleFlywheelVelo) {
+                if (FlywheelConfig.MAX_SPEED_RPS > cycleFlywheelVelo) {
                     cycleFlywheelVelo += 5;
                 }
             }));
