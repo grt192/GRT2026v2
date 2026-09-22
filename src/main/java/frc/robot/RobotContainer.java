@@ -63,7 +63,6 @@ import frc.robot.subsystems.swerve.SwerveSubsystem;
 import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionSubsystem;
 import frc.robot.util.LoggedCanivore;
-import frc.robot.util.PS5ControllerEmulator;
 import frc.robot.util.TracerSentinel;
 import java.util.function.DoubleSupplier;
 
@@ -430,9 +429,7 @@ public class RobotContainer {
     private void constructController() {
         driveController = new PS5DriveController();
         driveController.setDeadZone(0.035);
-        mechController = (Constants.CURRENT_MODE == Mode.REAL)
-            ? new CommandPS5Controller(1)
-            : new PS5ControllerEmulator(1);
+        mechController = new CommandPS5Controller(1);
     }
 
     /**
