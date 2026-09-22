@@ -17,6 +17,7 @@ import edu.wpi.first.wpilibj.util.Color8Bit;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+import frc.robot.Constants;
 import frc.robot.Constants.HopperConstants;
 import frc.robot.Constants.HopperConstants.HopperIntake;
 import frc.robot.util.LoggedSetpointTracker;
@@ -131,10 +132,19 @@ public class HopperSubsystem extends SubsystemBase {
     public void setHopperState(HopperIntake state) {
         switch (state) {
             case BALL_IN:
-                setVelocity(HopperConstants.TARGET_RPS);
+                // Demo mode runs the hopper open loop at full duty cycle instead of velocity control
+                if (Constants.DEMO_MODE) {
+                    setDutyCycle(1);
+                } else {
+                    setVelocity(HopperConstants.TARGET_RPS);
+                }
                 break;
             case BALL_OUT:
-                setVelocity(-HopperConstants.TARGET_RPS);
+                if (Constants.DEMO_MODE) {
+                    setDutyCycle(-1);
+                } else {
+                    setVelocity(-HopperConstants.TARGET_RPS);
+                }
                 break;
             default:
                 stop();
