@@ -5,6 +5,7 @@
 package frc.robot;
 
 import com.pathplanner.lib.auto.NamedCommands;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.cscore.MjpegServer;
 import edu.wpi.first.cscore.UsbCamera;
@@ -25,6 +26,7 @@ import frc.robot.Constants.CANType;
 import frc.robot.Constants.CycleShooterConstants;
 import frc.robot.Constants.Mode;
 import frc.robot.Constants.ShooterConstants.Flywheel;
+import frc.robot.Constants.ShooterConstants.Hood;
 import frc.robot.commands.AutonShooterSequence;
 import frc.robot.commands.CycleShot;
 import frc.robot.commands.SmashShot;
@@ -33,6 +35,7 @@ import frc.robot.commands.allign.AimToHubCommand;
 import frc.robot.commands.auton.ShootAndLeaveAuton;
 import frc.robot.commands.intake.PivotAndRollerIntakeCommand;
 import frc.robot.controllers.PS5DriveController;
+import frc.robot.controllers.XboxDriveController;
 import frc.robot.subsystems.fms.FieldManagementSubsystem;
 import frc.robot.subsystems.hopper.HopperIO;
 import frc.robot.subsystems.hopper.HopperIOTalonFX;
@@ -65,6 +68,7 @@ import frc.robot.subsystems.vision.VisionSubsystem;
 import frc.robot.util.LoggedCanivore;
 import frc.robot.util.TracerSentinel;
 import java.util.function.DoubleSupplier;
+import org.littletonrobotics.junction.Logger;
 
 /**
  * This class is where the bulk of the robot should be declared. Since
@@ -84,9 +88,14 @@ public class RobotContainer {
     private double cycleFlywheelVelo = CycleShooterConstants.FLYWHEEL_VELO_RPS;
     private DoubleSupplier cycleFlywheelOffsetGetter = () -> (cycleFlywheelVelo - CycleShooterConstants.FLYWHEEL_VELO_RPS);
 
+    private static final double CYCLE_FLYWHEEL_VELO_STEP_RPS = 5.0; // rotations per second
+    private static final double CYCLE_HOOD_POS_STEP_ROT = 0.01; // rotations
+    private double cycleHoodPos = CycleShooterConstants.HOOD_POSITION_ROT;
+
     private final SendableChooser<Command> autoChooser = new SendableChooser<>();
     private PS5DriveController driveController;
     private CommandPS5Controller mechController;
+    private XboxDriveController demoController;
     private final LoggedCanivore swerveCan = new LoggedCanivore(CANType.SWERVE);
     private final LoggedCanivore mechCan = new LoggedCanivore(CANType.MECH);
 
@@ -187,7 +196,8 @@ public class RobotContainer {
     /** Update controller-connection alerts. Call from {@link Robot#robotPeriodic()}. */
     public void updateAlerts() {
         driveControllerDisconnectedAlert.set(!DriverStation.isJoystickConnected(0));
-        mechControllerDisconnectedAlert.set(!DriverStation.isJoystickConnected(mechController.getHID().getPort()));
+        mechControllerDisconnectedAlert.set(
+            !Constants.DEMO_MODE && !DriverStation.isJoystickConnected(mechController.getHID().getPort()));
     }
 
     /**
@@ -206,6 +216,11 @@ public class RobotContainer {
      */
 
     private void configureBindings() {
+        if (Constants.DEMO_MODE) {
+            configureDemoBindings();
+            return;
+        }
+
         /*
          * Driving -- One joystick controls translation, the other rotation. If the
          * robot-relative button is held down,
@@ -423,10 +438,91 @@ public class RobotContainer {
     }
 
     /**
+     * Demo mode bindings: one Xbox controller on port 0 drives the swerve and runs
+     * every mech, with live cycle-shot tuning on the D-pad.
+     */
+    private void configureDemoBindings() {
+        if (Constants.SWERVE_ENABLED && swerveSubsystem != null) {
+            swerveSubsystem.setDefaultCommand(
+                new RunCommand(() -> {
+                    swerveSubsystem.setDriveSpeedLimit(1.0);
+                    swerveSubsystem.setDrivePowers(
+                        demoController.getForwardPower(),
+                        demoController.getLeftPower(),
+                        demoController.getRotatePower());
+                }, swerveSubsystem));
+
+            /* Pressing the button resets the field axes to the current robot axes. */
+            demoController.bindDriverHeadingReset(
+                () -> {
+                    swerveSubsystem.resetDriverHeading();
+                }, swerveSubsystem);
+        }
+        if (Constants.MECH_ENABLED) {
+            CommandXboxController controller = demoController.getController();
+
+            controller.rightBumper().whileTrue(
+                new CycleShot(flywheel, hood, tower, hopper, pivot, () -> cycleFlywheelVelo, () -> cycleHoodPos));
+            controller.rightTrigger().whileTrue(roller.runRollerOut());
+
+            controller.leftBumper().toggleOnTrue(pivot.togglePivot());
+            controller.leftTrigger().whileTrue(roller.runRollerIn());
+
+            controller.y().toggleOnTrue(new SmashShot(flywheel, hood, tower, hopper, pivot));
+            controller.a().toggleOnTrue(new TowerShot(flywheel, hood, tower, hopper, pivot));
+
+            publishCycleTuning();
+            controller.povUp().onTrue(
+                Commands.runOnce(() -> adjustCycleFlywheelVelo(CYCLE_FLYWHEEL_VELO_STEP_RPS)));
+            controller.povDown().onTrue(
+                Commands.runOnce(() -> adjustCycleFlywheelVelo(-CYCLE_FLYWHEEL_VELO_STEP_RPS)));
+
+            controller.povRight().onTrue(
+                Commands.runOnce(() -> adjustCycleHoodPos(CYCLE_HOOD_POS_STEP_ROT)));
+            controller.povLeft().onTrue(
+                Commands.runOnce(() -> adjustCycleHoodPos(-CYCLE_HOOD_POS_STEP_ROT)));
+
+            roller.setDefaultCommand(roller.stopRoller());
+            hopper.setDefaultCommand(hopper.stopHopper());
+            tower.setDefaultCommand(tower.stopTower());
+
+            controller.b().toggleOnTrue(Commands.parallel(pivot.jigglePivot(), hood.jiggleHood()));
+        }
+    }
+
+    private void adjustCycleFlywheelVelo(double deltaRotationsPerSecond) {
+        cycleFlywheelVelo = MathUtil.clamp(
+            cycleFlywheelVelo + deltaRotationsPerSecond,
+            0.0,
+            Flywheel.FLYWHEEL_MAX_SPEED_RPS);
+        publishCycleTuning();
+    }
+
+    private void adjustCycleHoodPos(double deltaRotations) {
+        cycleHoodPos = MathUtil.clamp(
+            cycleHoodPos + deltaRotations,
+            Hood.LOWER_ANGLE_LIMIT_ROT,
+            Hood.UPPER_ANGLE_LIMIT_ROT);
+        publishCycleTuning();
+    }
+
+    /** Publishes the live cycle-shot offsets so the operator can see what they are tuning. */
+    private void publishCycleTuning() {
+        Logger.recordOutput("CycleShot/FlywheelVeloRPS", cycleFlywheelVelo - CycleShooterConstants.FLYWHEEL_VELO_RPS);
+        Logger.recordOutput("CycleShot/HoodPosRotations", cycleHoodPos - CycleShooterConstants.HOOD_POSITION_ROT);
+    }
+
+    /**
      * Constructs the drive controller based on the name of the controller at port
      * 0
      */
     private void constructController() {
+        if (Constants.DEMO_MODE) {
+            demoController = new XboxDriveController();
+            demoController.setDeadZone(0.035);
+            return;
+        }
+
         driveController = new PS5DriveController();
         driveController.setDeadZone(0.035);
         mechController = new CommandPS5Controller(1);

@@ -59,6 +59,8 @@ public final class Constants {
     public static final boolean TUNING_MODE = true;
     public static final boolean SWERVE_ENABLED = true;
     public static final boolean MECH_ENABLED = true;
+    // Single Xbox controller on port 0 drives and runs the mechs (replaces the PS5 drive + mech controllers)
+    public static final boolean DEMO_MODE = false;
 
     // ==================== DRIVETRAIN ====================
 

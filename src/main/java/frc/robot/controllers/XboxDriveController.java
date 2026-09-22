@@ -1,9 +1,8 @@
 package frc.robot.controllers;
 
-import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.Subsystem;
-import edu.wpi.first.wpilibj2.command.button.JoystickButton;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 
 /**
@@ -11,22 +10,11 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
  */
 public class XboxDriveController extends BaseDriveController {
 
-    private double deadZone = 0.02;
-
-    private final XboxController driveController = new XboxController(0);
-
-    private final JoystickButton aButton = new JoystickButton(driveController, XboxController.Button.kA.value);
-    private final JoystickButton bButton = new JoystickButton(driveController, XboxController.Button.kB.value);
-    private final JoystickButton xButton = new JoystickButton(driveController, XboxController.Button.kX.value);
-    private final JoystickButton yButton = new JoystickButton(driveController, XboxController.Button.kY.value);
-    private final JoystickButton lBumper = new JoystickButton(driveController, XboxController.Button.kLeftBumper.value);
-    private final JoystickButton rBumper = new JoystickButton(
-        driveController,
-        XboxController.Button.kRightBumper.value);
-    private final JoystickButton driveLStickButton = new JoystickButton(
-        driveController, XboxController.Button.kLeftStick.value);
-    private final JoystickButton driveRStickButton = new JoystickButton(
-        driveController, XboxController.Button.kRightStick.value);
+    private final CommandXboxController driveController = new CommandXboxController(0);
+    private Trigger leftBumper = new Trigger(driveController.leftBumper());
+    private Trigger rightBumper = new Trigger(driveController.rightBumper());
+    private Trigger x = new Trigger(driveController.x());
+    private double deadZone = 0;
 
     @Override
     public double getForwardPower() {
@@ -60,39 +48,102 @@ public class XboxDriveController extends BaseDriveController {
 
     @Override
     public boolean getDriverHeadingResetButton() {
-        return aButton.getAsBoolean();
+        return x.getAsBoolean();
     }
 
     @Override
     public boolean getLeftBumper() {
-        return lBumper.getAsBoolean();
+        return leftBumper.getAsBoolean();
+    }
+
+    public Trigger getLeftBumperTrigger() {
+        return leftBumper;
+    }
+
+    public Trigger getRightBumperTrigger() {
+        return rightBumper;
     }
 
     @Override
     public boolean getRightBumper() {
-        return rBumper.getAsBoolean();
+        return rightBumper.getAsBoolean();
+    }
+
+    public boolean getRightTrigger() {
+        return driveController.getRightTriggerAxis() > .1;
+    }
+
+    public boolean getLeftTrigger() {
+        return driveController.getLeftTriggerAxis() > .1;
+    }
+
+    /**
+     * Gets the raw left trigger axis value.
+     *
+     * @return Value from 0.0 (not pressed) to 1.0 (fully pressed)
+     */
+    public double getLeftTriggerAxis() {
+        return driveController.getLeftTriggerAxis();
+    }
+
+    /**
+     * Gets the raw right trigger axis value.
+     *
+     * @return Value from 0.0 (not pressed) to 1.0 (fully pressed)
+     */
+    public double getRightTriggerAxis() {
+        return driveController.getRightTriggerAxis();
     }
 
     @Override
     public void bindDriverHeadingReset(
         Runnable command, Subsystem requiredSubsystem) {
-        aButton.onTrue(new InstantCommand(
+        InstantCommand instantCommand = new InstantCommand(
             command,
-            requiredSubsystem));
+            requiredSubsystem);
+        new Trigger(this::getDriverHeadingResetButton).onTrue(instantCommand);
     }
 
     @Override
     public void setDeadZone(double deadZone) {
+        this.deadZone = deadZone;
+    }
 
+    public int getPOV() {
+        return driveController.getHID().getPOV();
+    }
+
+    public Trigger y() {
+        return driveController.y();
+    }
+
+    public Trigger b() {
+        return driveController.b();
+    }
+
+    public CommandXboxController getController() {
+        return driveController;
+    }
+
+    public Trigger start() {
+        return driveController.start();
+    }
+
+    public Trigger x() {
+        return x;
+    }
+
+    public Trigger back() {
+        return driveController.back();
     }
 
     @Override
     public Trigger getAlignToReef() {
-        return (Trigger) xButton;
+        return x;
     }
 
     @Override
     public Trigger getAlignToSource() {
-        return (Trigger) aButton;
+        return driveController.a();
     }
 }
