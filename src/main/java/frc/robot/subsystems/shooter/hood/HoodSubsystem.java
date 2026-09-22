@@ -194,7 +194,7 @@ public class HoodSubsystem extends SubsystemBase {
         // Jiggle within the middle 50% of the hood's travel range.
         double range = Hood.UPPER_ANGLE_LIMIT_ROT - Hood.LOWER_ANGLE_LIMIT_ROT;
         double lowPos = Hood.LOWER_ANGLE_LIMIT_ROT + range * 0.25;
-        double highPos = Hood.LOWER_ANGLE_LIMIT_ROT + range * 0.25;
+        double highPos = Hood.LOWER_ANGLE_LIMIT_ROT + range * 0.75;
 
         Command jiggleHoodCommand = Commands.sequence(
             this.runOnce(() -> setPosition(highPos)),
