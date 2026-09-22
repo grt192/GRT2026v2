@@ -168,6 +168,19 @@ public class HoodSubsystem extends SubsystemBase {
             this::stop);
     }
 
+    public Command holdPositionThenHide(double positionRot) {
+        return this.startEnd(
+            () -> setPosition(positionRot),
+            () -> setPosition(Hood.LOWER_ANGLE_LIMIT_ROT));
+    }
+
+    public Command holdPositionThenHide(DoubleSupplier positionRotSupplier) {
+        // run(), not startEnd(), so the supplier is re-sampled every loop and the hood
+        // tracks live adjustments while the command is held.
+        return this.run(() -> setPosition(positionRotSupplier.getAsDouble()))
+            .finallyDo(() -> setPosition(Hood.LOWER_ANGLE_LIMIT_ROT));
+    }
+
     public Command hideHood() {
         return this.runOnce(() -> setPosition(Hood.LOWER_ANGLE_LIMIT_ROT))
             .andThen(Commands.waitUntil(this::atPositionSetpoint));

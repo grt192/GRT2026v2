@@ -1,81 +1,59 @@
 package frc.robot.commands;
 
-import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import frc.robot.Constants.CycleShooterConstants;
-import frc.robot.Constants.ShooterConstants;
 import frc.robot.Constants.SmashAndShootConstants;
 import frc.robot.subsystems.hopper.HopperSubsystem;
+import frc.robot.subsystems.intake.pivot.PivotSubsystem;
 import frc.robot.subsystems.shooter.hood.HoodSubsystem;
 import frc.robot.subsystems.shooter.tower.TowerSubsystem;
 import frc.robot.subsystems.shooter.flywheel.FlywheelSubsystem;
 import java.util.function.DoubleSupplier;
 
 /**
- * Manual shooter sequence - no auto-aim.
- * Hood position and FlywheelSubsystem RPS are passed in via the constructor so the same
- * sequence can be reused for different shot types (smash, cycle, etc.). Pivot
- * timing comes from SmashAndShootConstants.
- *
- * The shooterLearner offsets are applied on every loop, so live tuning via the
- * dashboard or operator buttons takes effect mid-shot.
+ * Cycle shot - no auto-aim. Both the FlywheelSubsystem RPS and the hood position are
+ * supplied so live tuning via the dashboard or operator buttons takes effect mid-shot.
+ * The pivot overload also agitates the pivot between its mid positions while feeding.
  */
-public class CycleShot extends Command {
+public class CycleShot extends ParallelCommandGroup {
 
-    private final FlywheelSubsystem flywheel;
-    private final HoodSubsystem hood;
-    private final TowerSubsystem tower;
-    private final HopperSubsystem hopper;
-
-    private final DoubleSupplier flywheelVeloRPS;
-
+    /** Cycle shot at the CycleShooterConstants hood position, with no pivot movement. */
     public CycleShot(
         FlywheelSubsystem flywheel,
         HoodSubsystem hood,
         TowerSubsystem tower,
         HopperSubsystem hopper,
         DoubleSupplier flyWheelVeloRPSSupplier) {
-        this.flywheel = flywheel;
-        this.hood = hood;
-        this.tower = tower;
-        this.hopper = hopper;
-        this.flywheelVeloRPS = flyWheelVeloRPSSupplier;
-
-        addRequirements(flywheel, hood, tower, hopper);
+        this(flywheel, hood, tower, hopper, flyWheelVeloRPSSupplier, () -> CycleShooterConstants.HOOD_POSITION_ROT);
     }
 
-    @Override
-    public void initialize() {
-        // Start ramping FlywheelSubsystem and moving hood to position
-        flywheel.setVelocity(flywheelVeloRPS.getAsDouble());
-        hood.setPosition(CycleShooterConstants.HOOD_POSITION_ROT);
+    /** Cycle shot with a live hood position, with no pivot movement. */
+    public CycleShot(
+        FlywheelSubsystem flywheel,
+        HoodSubsystem hood,
+        TowerSubsystem tower,
+        HopperSubsystem hopper,
+        DoubleSupplier flyWheelVeloRPSSupplier,
+        DoubleSupplier hoodPosRotSupplier) {
+        super(
+            flywheel.setFlywheelVelocity(flyWheelVeloRPSSupplier),
+            hood.holdPositionThenHide(hoodPosRotSupplier),
+            tower.runTowerDutyCycle(SmashAndShootConstants.TOWER_DUTY_CYCLE),
+            hopper.runHopperDutyCycle(SmashAndShootConstants.INDEXER_DUTY_CYCLE));
     }
 
-    @Override
-    public void execute() {
-        // Keep commanding FlywheelSubsystem and hood targets (with live operator offsets)
-        flywheel.setVelocity(flywheelVeloRPS.getAsDouble());
-        hood.setPosition(CycleShooterConstants.HOOD_POSITION_ROT);
-
-        // Only feed balls when FlywheelSubsystem is at speed AND hood is at position
-        if (/* fly.wantedVel() && hd.wantedAngl() */ true) {
-            tower.setDutyCycle(SmashAndShootConstants.TOWER_DUTY_CYCLE);
-            hopper.setDutyCycle(SmashAndShootConstants.INDEXER_DUTY_CYCLE);
-        } else {
-            tower.stop();
-            hopper.stop();
-        }
-    }
-
-    @Override
-    public boolean isFinished() {
-        return false;
-    }
-
-    @Override
-    public void end(boolean interrupted) {
-        flywheel.stop();
-        hood.setPosition(ShooterConstants.Hood.LOWER_ANGLE_LIMIT_ROT);
-        tower.stop();
-        hopper.stop();
+    /** Cycle shot with a live hood position that agitates the pivot while feeding. */
+    public CycleShot(
+        FlywheelSubsystem flywheel,
+        HoodSubsystem hood,
+        TowerSubsystem tower,
+        HopperSubsystem hopper,
+        PivotSubsystem pivot,
+        DoubleSupplier flyWheelVeloRPSSupplier,
+        DoubleSupplier hoodPosRotSupplier) {
+        this(flywheel, hood, tower, hopper, flyWheelVeloRPSSupplier, hoodPosRotSupplier);
+        addCommands(pivot.cyclePivotMid(
+            SmashAndShootConstants.INITIAL_DELAY_SECONDS,
+            SmashAndShootConstants.TOGGLE_INTERVAL_SECONDS));
     }
 }

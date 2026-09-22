@@ -44,6 +44,7 @@ public class PivotSubsystem extends SubsystemBase {
         MotorControlMode.DutyCycle,
         MotorControlMode.Voltage,
         MotorControlMode.Position);
+    private boolean intakeDeployed = false;
 
     private final SysIdRoutine sysIdRoutine;
 
@@ -181,14 +182,20 @@ public class PivotSubsystem extends SubsystemBase {
 
     public Command deployPivot() {
         return this.runOnce(() -> {
+            intakeDeployed = true;
             setPosition(IntakeConstants.PIVOT_OUT_POS_ROT);
         });
     }
 
     public Command retractPivot() {
         return this.runOnce(() -> {
+            intakeDeployed = false;
             setPosition(IntakeConstants.PIVOT_IN_POS_ROT);
         });
+    }
+
+    public Command togglePivot() {
+        return Commands.either(retractPivot(), deployPivot(), () -> intakeDeployed);
     }
 
     public Command jigglePivot() {
@@ -200,6 +207,18 @@ public class PivotSubsystem extends SubsystemBase {
         jigglePivotCommand.addRequirements(this);
 
         return jigglePivotCommand;
+    }
+
+    public Command cyclePivotMid(double initialDelaySeconds, double toggleIntervalSeconds) {
+        return Commands.sequence(
+            this.runOnce(() -> setPosition(IntakeConstants.PIVOT_MID_LOWER_ROT)),
+            Commands.waitSeconds(initialDelaySeconds),
+            Commands.sequence(
+                this.runOnce(() -> setPosition(IntakeConstants.PIVOT_MID_UPPER_ROT)),
+                Commands.waitSeconds(toggleIntervalSeconds),
+                this.runOnce(() -> setPosition(IntakeConstants.PIVOT_MID_LOWER_ROT)),
+                Commands.waitSeconds(toggleIntervalSeconds)).repeatedly())
+            .finallyDo(() -> setPosition(IntakeConstants.PIVOT_OUT_POS_ROT));
     }
 
     public Command holdPivotOut() {

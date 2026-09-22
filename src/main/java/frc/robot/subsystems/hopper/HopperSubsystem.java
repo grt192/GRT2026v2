@@ -195,6 +195,12 @@ public class HopperSubsystem extends SubsystemBase {
         return runHopperState(HopperIntake.BALL_IN);
     }
 
+    public Command runHopperDutyCycle(double dutyCycle) {
+        return this.runEnd(
+            () -> setDutyCycle(dutyCycle),
+            this::stop);
+    }
+
     public Command stopHopper() {
         return this.runOnce(this::stop);
     }
