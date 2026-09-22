@@ -228,6 +228,15 @@ public class KrakenSwerveModule {
     }
 
     /**
+     * Refreshes the cached status signals for both motors. Call once per loop
+     * before reading any module state (positions, velocities, logging).
+     */
+    public void refreshSignals() {
+        driveMotor.refreshSignals();
+        steerMotor.refreshSignals();
+    }
+
+    /**
      * Publishes steer motor statistics to NetworkTables
      */
     public void publishSteerStats() {

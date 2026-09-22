@@ -9,8 +9,10 @@ import static frc.robot.Constants.SwerveSteerConstants.STEER_RAMP_RATE;
 import static frc.robot.Constants.SwerveSteerConstants.STEER_STATOR_CURRENT_LIMIT;
 import static frc.robot.Constants.SwerveSteerConstants.STEER_SUPPLY_CURRENT_LIMIT;
 
+import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusCode;
+import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.MagnetSensorConfigs;
 import com.ctre.phoenix6.configs.MotionMagicConfigs;
@@ -29,6 +31,11 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableEvent;
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.AngularVelocity;
+import edu.wpi.first.units.measure.Current;
+import edu.wpi.first.units.measure.Temperature;
+import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.EnumSet;
 import org.littletonrobotics.junction.Logger;
@@ -52,6 +59,16 @@ public class SteerMotor extends SubsystemBase {
     private DoublePublisher closedLoopReferencePublisher;
     private DoublePublisher gurtMotorPos1;
     private NetworkTableEntry motorNewPos;
+
+    private StatusSignal<Angle> positionSignal;
+    private StatusSignal<AngularVelocity> velocitySignal;
+    private StatusSignal<Voltage> appliedVoltsSignal;
+    private StatusSignal<Current> supplyCurrentSignal;
+    private StatusSignal<Current> torqueCurrentSignal;
+    private StatusSignal<Temperature> deviceTempSignal;
+    private StatusSignal<Double> closedLoopErrorSignal;
+    private StatusSignal<Double> closedLoopReferenceSignal;
+    private StatusSignal<Angle> cancoderAbsolutePositionSignal;
 
     private double gurtMotorPos = 0.0;
     private double targetPos = 0.0;
@@ -190,8 +207,8 @@ public class SteerMotor extends SubsystemBase {
 
     public void publishStats() {
 
-        motorPositionPublisher.set(cancoder.getAbsolutePosition().getValueAsDouble());
-        targetPositionPublisher.set(motor.getClosedLoopReference().getValueAsDouble());
+        motorPositionPublisher.set(cancoderAbsolutePositionSignal.getValueAsDouble());
+        targetPositionPublisher.set(closedLoopReferenceSignal.getValueAsDouble());
 
         // encoderPositionPublisher.set(cancoder.getPosition().getValueAsDouble());
         // targetPositionPublisher.set(rotorRotations); // Just show current position
@@ -212,17 +229,52 @@ public class SteerMotor extends SubsystemBase {
         cancoder = new CANcoder(encoderID, canivore);
         configureMotor();
         initNt(motorCAN);
+        initSignals();
+    }
+
+    /**
+     * Initializes and caches the Phoenix 6 status signals read by this motor.
+     * The CANcoder is left at its default frame rates (no optimizeBusUtilization)
+     * so the RemoteCANcoder feedback the steer closed loop relies on keeps flowing.
+     */
+    private void initSignals() {
+        positionSignal = motor.getPosition();
+        velocitySignal = motor.getVelocity();
+        appliedVoltsSignal = motor.getMotorVoltage();
+        supplyCurrentSignal = motor.getSupplyCurrent();
+        torqueCurrentSignal = motor.getTorqueCurrent();
+        deviceTempSignal = motor.getDeviceTemp();
+        closedLoopErrorSignal = motor.getClosedLoopError();
+        closedLoopReferenceSignal = motor.getClosedLoopReference();
+        cancoderAbsolutePositionSignal = cancoder.getAbsolutePosition();
+
+        BaseStatusSignal.setUpdateFrequencyForAll(250.0, positionSignal, velocitySignal);
+        BaseStatusSignal.setUpdateFrequencyForAll(
+            100.0, appliedVoltsSignal, supplyCurrentSignal, torqueCurrentSignal,
+            deviceTempSignal, closedLoopErrorSignal, closedLoopReferenceSignal,
+            cancoderAbsolutePositionSignal);
+    }
+
+    /**
+     * Refreshes all cached status signals so the latest values are read.
+     * Call once per loop before reading/logging any cached signal.
+     */
+    public void refreshSignals() {
+        BaseStatusSignal.refreshAll(
+            positionSignal, velocitySignal, appliedVoltsSignal, supplyCurrentSignal,
+            torqueCurrentSignal, deviceTempSignal, closedLoopErrorSignal,
+            closedLoopReferenceSignal, cancoderAbsolutePositionSignal);
     }
 
     public void logStats() {
-        Logger.recordOutput("steer/" + motorID + "/position", motor.getPosition().getValueAsDouble());
-        Logger.recordOutput("steer/" + motorID + "/velocityRPM", motor.getVelocity().getValueAsDouble() * STEER_GEAR_REDUCTION * 60.0);
+        Logger.recordOutput("steer/" + motorID + "/position", positionSignal.getValueAsDouble());
+        Logger.recordOutput("steer/" + motorID + "/velocityRPM", velocitySignal.getValueAsDouble() * STEER_GEAR_REDUCTION * 60.0);
         Logger.recordOutput("steer/" + motorID + "/targetPosition", gurtMotorPos);
-        Logger.recordOutput("steer/" + motorID + "/appliedVolts", motor.getMotorVoltage().getValueAsDouble());
-        Logger.recordOutput("steer/" + motorID + "/supplyCurrent", motor.getSupplyCurrent().getValueAsDouble());
-        Logger.recordOutput("steer/" + motorID + "/torqueCurrent", motor.getTorqueCurrent().getValueAsDouble());
-        Logger.recordOutput("steer/" + motorID + "/temperature", motor.getDeviceTemp().getValueAsDouble());
-        Logger.recordOutput("steer/" + motorID + "/closedLoopError", motor.getClosedLoopError().getValueAsDouble());
+        Logger.recordOutput("steer/" + motorID + "/appliedVolts", appliedVoltsSignal.getValueAsDouble());
+        Logger.recordOutput("steer/" + motorID + "/supplyCurrent", supplyCurrentSignal.getValueAsDouble());
+        Logger.recordOutput("steer/" + motorID + "/torqueCurrent", torqueCurrentSignal.getValueAsDouble());
+        Logger.recordOutput("steer/" + motorID + "/temperature", deviceTempSignal.getValueAsDouble());
+        Logger.recordOutput("steer/" + motorID + "/closedLoopError", closedLoopErrorSignal.getValueAsDouble());
     }
 
     /**
@@ -282,13 +334,13 @@ public class SteerMotor extends SubsystemBase {
      * @return get position range 0-1
      */
     public double getPosition() {
-        double motorCurrentPos = motor.getPosition().getValueAsDouble();
+        double motorCurrentPos = positionSignal.getValueAsDouble();
         // ensures current motor position is between 0 and 1
         return motorCurrentPos;
     }
 
     public double getVelocityRPM() {
-        return motor.getVelocity().getValueAsDouble() * STEER_GEAR_REDUCTION * 60.0;
+        return velocitySignal.getValueAsDouble() * STEER_GEAR_REDUCTION * 60.0;
     }
 
     public void setCruiseVelocity(double velocity) {
