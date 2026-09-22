@@ -299,9 +299,8 @@ public final class Constants {
             public static final double COM_LENGTH_M = Units.inchesToMeters(Math.hypot(0.121549, 9.035458));
 
             // Angle limits (rotations)
-            public static final double UPPER_ANGLE_LIMIT_ROT = 0.1;
+            public static final double UPPER_ANGLE_LIMIT_ROT = 0.075;
             public static final double LOWER_ANGLE_LIMIT_ROT = 0.0;
-            public static final double INIT_ANGLE_ROT = UPPER_ANGLE_LIMIT_ROT;
             public static final double MAGNET_OFFSET = -0.05688;
 
             // Current limits

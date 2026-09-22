@@ -29,7 +29,7 @@ public class HoodIOTalonFXSim extends HoodIOTalonFX {
         Units.rotationsToRadians(ShooterConstants.Hood.LOWER_ANGLE_LIMIT_ROT),
         Units.rotationsToRadians(ShooterConstants.Hood.UPPER_ANGLE_LIMIT_ROT),
         false,
-        Units.rotationsToRadians(ShooterConstants.Hood.INIT_ANGLE_ROT));
+        Units.rotationsToRadians(ShooterConstants.Hood.LOWER_ANGLE_LIMIT_ROT));
 
     public HoodIOTalonFXSim(LoggedCanivore canivore) {
         super(canivore);
