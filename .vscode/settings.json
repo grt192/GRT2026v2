@@ -18,14 +18,12 @@
     {
       "name": "WPIlibUnitTests",
       "workingDirectory": "${workspaceFolder}/build/jni/release",
-      "vmargs": [
-        "-Djava.library.path=${workspaceFolder}/build/jni/release"
-      ],
+      "vmargs": ["-Djava.library.path=${workspaceFolder}/build/jni/release"],
       "env": {
         "LD_LIBRARY_PATH": "${workspaceFolder}/build/jni/release",
         "DYLD_LIBRARY_PATH": "${workspaceFolder}/build/jni/release"
       }
-    },
+    }
   ],
   "java.test.defaultConfig": "WPIlibUnitTests",
   "java.import.gradle.annotationProcessing.enabled": false,
@@ -57,20 +55,12 @@
     "javax.smartcardio.*",
     "edu.wpi.first.math.proto.*",
     "edu.wpi.first.math.**.proto.*",
-    "edu.wpi.first.math.**.struct.*",
+    "edu.wpi.first.math.**.struct.*"
   ],
   "java.dependency.enableDependencyCheckup": false,
   "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable",
   "editor.tabSize": 4,
   "editor.formatOnSave": true,
   "java.format.settings.url": "./eclipse-java-formatter.xml",
-  "cSpell.words": [
-    "Auton",
-    "Configurator",
-    "constantname",
-    "periodics",
-    "Quasistatic",
-    "Setpoints",
-    "TELEOP"
-  ]
+  "cSpell.words": ["Auton", "COEFF", "Configurator", "constantname", "periodics", "Quasistatic", "Setpoints", "TELEOP"]
 }
