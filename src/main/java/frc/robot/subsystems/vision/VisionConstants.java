@@ -29,22 +29,6 @@ public final class VisionConstants {
     // How long a tag stays in the logged TagPoses after it was last seen
     public static final double TARGET_LOG_TIME_SECS = 0.1;
 
-    // intake
-    public static final CameraConfig CAMERA_CONFIG_100 = new CameraConfig(
-        "7",
-        new Transform3d(
-            0, 0, 0.5334,
-            new Rotation3d(-Math.toRadians(50), 0, 0)),
-        1);
-
-    // hopper
-    public static final CameraConfig CAMERA_CONFIG_101 = new CameraConfig(
-        "7",
-        new Transform3d(
-            0.28, 0, 0,
-            new Rotation3d(0, -Math.toRadians(5), 0)),
-        1);
-
     // the big 3 cameras
     public static final CameraConfig CAMERA_CONFIG_1 = new CameraConfig(// climb camera
         "1",

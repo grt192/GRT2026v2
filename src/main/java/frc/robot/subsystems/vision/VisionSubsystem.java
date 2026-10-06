@@ -27,7 +27,7 @@ public class VisionSubsystem extends SubsystemBase {
 
     @Override
     public void periodic() {
-        double timestamp = Timer.getFPGATimestamp();
+        double timestamp = Timer.getTimestamp();
         Rotation2d heading = headingSupplier.get();
 
         for (VisionCamera camera : cameras) {

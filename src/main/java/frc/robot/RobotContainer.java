@@ -119,8 +119,6 @@ public class RobotContainer {
             ? new AimToHubCommand(swerveSubsystem, fmsSubsystem)
             : null;
 
-    // private final FuelDetectionSubsystem fuelDetectionSubsystem = new FuelDetectionSubsystem(VisionConstants.FUEL_DETECTION_CONFIG);
-
     private final VisionSubsystem vision;
     private UsbCamera driverCam;
 
@@ -133,15 +131,6 @@ public class RobotContainer {
      * The container for the robot. Contains subsystems, OI devices, and commands.
      */
     public RobotContainer() {
-        boolean hasSwerve = Constants.SWERVE_ENABLED && swerveSubsystem != null;
-        Consumer<TimestampedVisionUpdate> visionConsumer = hasSwerve
-            ? swerveSubsystem::addVisionMeasurements
-            : (update) -> {
-            };
-        Supplier<Rotation2d> visionHeadingSupplier = hasSwerve
-            ? () -> swerveSubsystem.getRobotPosition().getRotation()
-            : () -> Rotation2d.kZero;
-
         switch (Constants.CURRENT_MODE) {
             case REAL:
                 pivot = new PivotSubsystem(new PivotIOTalonFX(mechCan));
@@ -150,12 +139,10 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIOTalonFX(mechCan));
                 flywheel = new FlywheelSubsystem(new FlywheelIOTalonFX(mechCan));
                 hood = new HoodSubsystem(new HoodIOTalonFX(mechCan));
-                vision = new VisionSubsystem(
-                    visionConsumer,
-                    visionHeadingSupplier,
-                    new VisionCamera(new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_1), VisionConstants.CAMERA_CONFIG_1),
-                    new VisionCamera(new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_2), VisionConstants.CAMERA_CONFIG_2),
-                    new VisionCamera(new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_3), VisionConstants.CAMERA_CONFIG_3));
+                vision = createVision(
+                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_1),
+                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_2),
+                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_3));
                 break;
             case SIM:
                 pivot = new PivotSubsystem(new PivotIOTalonFXSim(mechCan));
@@ -164,12 +151,7 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIOTalonFXSim(mechCan));
                 flywheel = new FlywheelSubsystem(new FlywheelIOTalonFXSim(mechCan));
                 hood = new HoodSubsystem(new HoodIOTalonFXSim(mechCan));
-                vision = new VisionSubsystem(
-                    visionConsumer,
-                    visionHeadingSupplier,
-                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_1),
-                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_2),
-                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_3));
+                vision = createVision(new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
                 break;
             case REPLAY:
             default:
@@ -179,15 +161,10 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIO() {});
                 flywheel = new FlywheelSubsystem(new FlywheelIO() {});
                 hood = new HoodSubsystem(new HoodIO() {});
-                vision = new VisionSubsystem(
-                    visionConsumer,
-                    visionHeadingSupplier,
-                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_1),
-                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_2),
-                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_3));
+                vision = createVision(new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
                 break;
         }
-        if (hasSwerve) {
+        if (Constants.SWERVE_ENABLED && swerveSubsystem != null) {
             swerveSubsystem.setPoseResetListener(
                 (pose) -> vision.resetHeading(Timer.getTimestamp(), pose.getRotation()));
         }
@@ -214,6 +191,24 @@ public class RobotContainer {
         NamedCommands.registerCommand("pivotAndRollerIntake", new PivotAndRollerIntakeCommand(pivot, roller));
         NamedCommands.registerCommand("pivotdownandrunrollers", new PivotAndRollerIntakeCommand(pivot, roller));
         NamedCommands.registerCommand("shootSequence", new AutonShooterSequence(flywheel, hood, tower, hopper, pivot));
+    }
+
+    private VisionSubsystem createVision(VisionIO io1, VisionIO io2, VisionIO io3) {
+        boolean hasSwerve = Constants.SWERVE_ENABLED && swerveSubsystem != null;
+        Consumer<TimestampedVisionUpdate> visionConsumer = hasSwerve
+            ? swerveSubsystem::addVisionMeasurements
+            : (update) -> {
+            };
+        Supplier<Rotation2d> visionHeadingSupplier = hasSwerve
+            ? () -> swerveSubsystem.getRobotPosition().getRotation()
+            : () -> Rotation2d.kZero;
+
+        return new VisionSubsystem(
+            visionConsumer,
+            visionHeadingSupplier,
+            new VisionCamera(io1, VisionConstants.CAMERA_CONFIG_1),
+            new VisionCamera(io2, VisionConstants.CAMERA_CONFIG_2),
+            new VisionCamera(io3, VisionConstants.CAMERA_CONFIG_3));
     }
 
     /** Update controller-connection alerts. Call from {@link Robot#robotPeriodic()}. */
