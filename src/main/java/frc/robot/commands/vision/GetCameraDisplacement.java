@@ -10,20 +10,20 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Constants.RotateToAngleConstants;
 import frc.robot.subsystems.swerve.SwerveSubsystem;
-import frc.robot.subsystems.vision.VisionSubsystem;
+import frc.robot.subsystems.vision.OldVisionSubsystem;
 import java.io.Serial;
 import java.util.function.BooleanSupplier;
 import javax.xml.crypto.dsig.Transform;
 
 public class GetCameraDisplacement extends Command {
-    private final VisionSubsystem visionSubsytem;
+    private final OldVisionSubsystem visionSubsytem;
     private final Transform3d robotToApriltag;
     private final String camID;
     private Transform3d robotToCamera;
     private Transform3d cameraToApriltag;
     // private StructPublisher<Pose2d> cameraPosePublisher;
 
-    public GetCameraDisplacement(VisionSubsystem visionSubsytem, Transform3d robotToApriltag) {
+    public GetCameraDisplacement(OldVisionSubsystem visionSubsytem, Transform3d robotToApriltag) {
         this.visionSubsytem = visionSubsytem;
         this.robotToApriltag = robotToApriltag;
         this.camID = this.visionSubsytem.getCamID();

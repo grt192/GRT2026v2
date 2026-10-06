@@ -61,7 +61,7 @@ import frc.robot.subsystems.shooter.tower.TowerSubsystem;
 import frc.robot.subsystems.swerve.AimSubsystem;
 import frc.robot.subsystems.swerve.SwerveSubsystem;
 import frc.robot.subsystems.vision.VisionConstants;
-import frc.robot.subsystems.vision.VisionSubsystem;
+import frc.robot.subsystems.vision.OldVisionSubsystem;
 import frc.robot.util.LoggedCanivore;
 import frc.robot.util.PS5ControllerEmulator;
 import frc.robot.util.TracerSentinel;
@@ -113,16 +113,16 @@ public class RobotContainer {
 
     // private final FuelDetectionSubsystem fuelDetectionSubsystem = new FuelDetectionSubsystem(VisionConstants.FUEL_DETECTION_CONFIG);
 
-    private final VisionSubsystem visionSubsystem1 = new VisionSubsystem(
+    private final OldVisionSubsystem visionSubsystem1 = new OldVisionSubsystem(
         VisionConstants.CAMERA_CONFIG_1);
-    private final VisionSubsystem visionSubsystem2 = new VisionSubsystem(
+    private final OldVisionSubsystem visionSubsystem2 = new OldVisionSubsystem(
         VisionConstants.CAMERA_CONFIG_2);
-    private final VisionSubsystem visionSubsystem3 = new VisionSubsystem(
+    private final OldVisionSubsystem visionSubsystem3 = new OldVisionSubsystem(
         VisionConstants.CAMERA_CONFIG_3);
     private UsbCamera driverCam;
 
     private double desiredHoodSpeed = 0;
-    // private final VisionSubsystem visionSubsystem1 = new VisionSubsystem(
+    // private final OldVisionSubsystem visionSubsystem1 = new OldVisionSubsystem(
     // VisionConstants.CAMERA_CONFIG_11);
 
     private final Alert driveControllerDisconnectedAlert = new Alert("Drive Controller Disconnected", AlertType.kWarning);
