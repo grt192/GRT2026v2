@@ -16,6 +16,7 @@ import org.ironmaple.simulation.drivesims.configs.SwerveModuleSimulationConfig;
 import org.ironmaple.simulation.seasonspecific.rebuilt2026.Arena2026Rebuilt;
 import org.dyn4j.dynamics.Body;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.Notifier;
@@ -87,6 +88,11 @@ public class SwerveDriveSim {
         return driveSimulation.getSimulatedDriveTrainPose();
     }
 
+    /** {@link #getPose()} with the height and tilt from driving over the BUMPs. */
+    public Pose3d getPose3d() {
+        return RebuiltTerrain.poseOnTerrain(getPose());
+    }
+
     /**
      * Moves the simulated robot. The simulated gyro integrates rotation rate, so it keeps reading
      * continuously through the move, like a real gyro when odometry is reset.
@@ -105,6 +111,12 @@ public class SwerveDriveSim {
 
     /** The 2026 field, plus a way to drop a body's contacts (the physics world is protected). */
     private static class TeleportableArena extends Arena2026Rebuilt {
+        TeleportableArena() {
+            // false = the HUBs are just the HUB, so the BUMPs beside them can be driven over (true walls
+            // off the HUB and both BUMPs). Their height and tilt come from RebuiltTerrain
+            super(false);
+        }
+
         void clearContacts(Body body) {
             physicsWorld.removeBody(body);
             physicsWorld.addBody(body);

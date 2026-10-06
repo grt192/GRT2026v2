@@ -5,7 +5,7 @@ import java.util.List;
 import org.littletonrobotics.junction.Logger;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.Timer;
@@ -76,15 +76,18 @@ public class VisionCamera {
             // https://github.com/Mechanical-Advantage/RobotCode2025Public/blob/3ea1eb036b2dc06e4ecb14d98bba7f602a1cd62a/src/main/java/org/littletonrobotics/frc2025/subsystems/vision/Vision.java#L212-L234
             double scale = (Math.pow(obs.avgTagDist(), VisionConstants.STD_DIST_PWR) / (obs.tagCount() * obs.tagCount())) * camConfig.getStdDevFactor();
             double xyStdDev = (obs.isMultiTag() ? VisionConstants.XY_COEFF_MULTI_TAG : VisionConstants.XY_COEFF_SINGLE_TAG) * scale;
+            // Single-tag solves take rotation from the gyro, so only trust their translation in the plane
+            double zStdDev = obs.isMultiTag() ? xyStdDev : Double.POSITIVE_INFINITY;
             double thetaStdDev = obs.isMultiTag() ? VisionConstants.THETA_COEFF * scale : Double.POSITIVE_INFINITY;
 
             predictions.add(new TimestampedVisionUpdate(obs.timestamp(), obs.pose(), obs.isMultiTag(), VecBuilder.fill(
                 xyStdDev,
                 xyStdDev,
+                zStdDev,
                 thetaStdDev)));
 
             Logger.recordOutput(logKey + "/LatencySecs", Timer.getTimestamp() - obs.timestamp());
-            Logger.recordOutput(logKey + "/RobotPose", obs.pose().toPose2d());
+            Logger.recordOutput(logKey + "/RobotPose", obs.pose());
             Logger.recordOutput(logKey + "/TagPoses", tagPoses.toArray(new Pose3d[0]));
         }
 
@@ -96,11 +99,11 @@ public class VisionCamera {
         visionEstimates = predictions;
     }
 
-    public void updateHeading(double timestamp, Rotation2d heading) {
+    public void updateHeading(double timestamp, Rotation3d heading) {
         io.updateHeading(timestamp, heading);
     }
 
-    public void resetHeading(double timestamp, Rotation2d heading) {
+    public void resetHeading(double timestamp, Rotation3d heading) {
         io.resetHeading(timestamp, heading);
     }
 }

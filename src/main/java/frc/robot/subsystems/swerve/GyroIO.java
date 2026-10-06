@@ -1,7 +1,7 @@
 package frc.robot.subsystems.swerve;
 
 import org.littletonrobotics.junction.AutoLog;
-import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 
 public interface GyroIO {
     @AutoLog
@@ -21,8 +21,9 @@ public interface GyroIO {
         public double tempC = 0.0;
         public boolean connected = false;
 
-        public double[] odometryYawTimestamps = new double[] {};
-        public Rotation2d[] odometryYawPositions = new Rotation2d[] {};
+        public double[] odometryTimestamps = new double[] {};
+        // Full orientation (yaw, pitch, roll) per sample, for 3D odometry
+        public Rotation3d[] odometryRotations = new Rotation3d[] {};
     }
 
     public default void updateInputs(GyroIOInputs inputs) {}

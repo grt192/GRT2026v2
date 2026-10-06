@@ -11,9 +11,12 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
-import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
+import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Twist2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
@@ -59,10 +62,11 @@ public class DriveSubsystem extends SubsystemBase {
     private final SingleModule[] modules = new SingleModule[4]; // FL, FR, BL, BR
 
     private final SwerveDriveKinematics kinematics = new SwerveDriveKinematics(FL_POS, FR_POS, BL_POS, BR_POS);
-    private final SwerveDrivePoseEstimator poseEstimator;
+    private final SwerveDrivePoseEstimator3d poseEstimator;
 
     // Odometry
-    private Rotation2d rawGyroRotation = Rotation2d.kZero;
+    // Full gyro orientation; yaw drives the driver heading, pitch/roll let odometry climb the BUMPs
+    private Rotation3d rawGyroRotation = Rotation3d.kZero;
     private SwerveModulePosition[] lastModulePositions = new SwerveModulePosition[] {
             new SwerveModulePosition(),
             new SwerveModulePosition(),
@@ -70,7 +74,7 @@ public class DriveSubsystem extends SubsystemBase {
             new SwerveModulePosition()
     };
     private boolean odometryInitialized = false;
-    private Consumer<Pose2d> poseResetListener = (pose) -> {
+    private Consumer<Pose3d> poseResetListener = (pose) -> {
     };
     private Rotation2d driverHeadingOffset = Rotation2d.kZero;
 
@@ -114,11 +118,14 @@ public class DriveSubsystem extends SubsystemBase {
         modules[2] = new SingleModule(blModuleIO, SwerveModule.BL);
         modules[3] = new SingleModule(brModuleIO, SwerveModule.BR);
 
-        poseEstimator = new SwerveDrivePoseEstimator(
+        poseEstimator = new SwerveDrivePoseEstimator3d(
             kinematics,
             rawGyroRotation,
             lastModulePositions,
-            Pose2d.kZero);
+            Pose3d.kZero,
+            VecBuilder.fill(ODOMETRY_XY_STD_DEV_M, ODOMETRY_XY_STD_DEV_M, ODOMETRY_Z_STD_DEV_M, ODOMETRY_THETA_STD_DEV_RAD),
+            // Placeholder: every vision measurement brings its own std devs (see VisionCamera)
+            VecBuilder.fill(0.9, 0.9, 0.9, 0.9));
 
         // Sim feeds odometry one sample per loop instead (see ModuleIOTalonFXSim)
         if (Constants.CURRENT_MODE == Mode.REAL) {
@@ -187,14 +194,14 @@ public class DriveSubsystem extends SubsystemBase {
     private void updateOdometry() {
         double[] sampleTimestamps = Constants.CURRENT_MODE == Mode.SIM
             ? new double[] {Timer.getTimestamp()}
-            : gyroInputs.odometryYawTimestamps; // All signals are sampled together
+            : gyroInputs.odometryTimestamps; // All signals are sampled together
 
         int sampleCount = sampleTimestamps.length;
         for (SingleModule module : modules) {
             sampleCount = Math.min(sampleCount, module.getOdometryPositions().length);
         }
         if (gyroInputs.connected) {
-            sampleCount = Math.min(sampleCount, gyroInputs.odometryYawPositions.length);
+            sampleCount = Math.min(sampleCount, gyroInputs.odometryRotations.length);
         }
 
         for (int i = 0; i < sampleCount; i++) {
@@ -217,15 +224,17 @@ public class DriveSubsystem extends SubsystemBase {
             }
 
             if (gyroInputs.connected) {
-                rawGyroRotation = gyroInputs.odometryYawPositions[i];
+                rawGyroRotation = gyroInputs.odometryRotations[i];
             } else {
-                // Gyro is gone, so integrate the heading from wheel motion instead
+                // Gyro is gone, so integrate the heading from wheel motion instead and assume level
                 Twist2d twist = kinematics.toTwist2d(moduleDeltas);
-                rawGyroRotation = rawGyroRotation.plus(new Rotation2d(twist.dtheta));
+                rawGyroRotation = new Rotation3d(0.0, 0.0, rawGyroRotation.getZ() + twist.dtheta);
             }
 
             if (!odometryInitialized) {
-                poseEstimator.resetPosition(rawGyroRotation, modulePositions, getRobotPosition());
+                Pose3d currentPose = poseEstimator.getEstimatedPosition();
+                poseEstimator.resetPosition(
+                    rawGyroRotation, modulePositions, withGyroTilt(currentPose.toPose2d(), currentPose.getZ()));
                 odometryInitialized = true;
             }
 
@@ -408,7 +417,7 @@ public class DriveSubsystem extends SubsystemBase {
 
     public void addVisionMeasurements(TimestampedVisionUpdate update) {
         poseEstimator.addVisionMeasurement(
-            update.pose().toPose2d(),
+            update.pose(),
             update.timestamp(),
             update.stdDevs());
     }
@@ -447,7 +456,7 @@ public class DriveSubsystem extends SubsystemBase {
      * @return The angle of the robot relative to the driver heading.
      */
     public Rotation2d getDriverHeading() {
-        return rawGyroRotation.minus(driverHeadingOffset);
+        return rawGyroRotation.toRotation2d().minus(driverHeadingOffset);
     }
 
     /**
@@ -456,7 +465,7 @@ public class DriveSubsystem extends SubsystemBase {
      * @param currentRotation The new driver heading.
      */
     public void resetDriverHeading(Rotation2d currentRotation) {
-        driverHeadingOffset = rawGyroRotation.minus(currentRotation);
+        driverHeadingOffset = rawGyroRotation.toRotation2d().minus(currentRotation);
     }
 
     /**
@@ -474,18 +483,41 @@ public class DriveSubsystem extends SubsystemBase {
     }
 
     /**
-     * Gets the current robot pose.
+     * Gets the current robot pose on the field (the 3D estimate flattened).
      *
      * @return The robot Pose2d.
      */
     @AutoLogOutput(key = "Swerve/EstimatedPose")
     public Pose2d getRobotPosition() {
+        return poseEstimator.getEstimatedPosition().toPose2d();
+    }
+
+    /** Gets the full 3D pose estimate, including height and tilt (e.g. on a BUMP). */
+    @AutoLogOutput(key = "Swerve/EstimatedPose3d")
+    public Pose3d getRobotPose3d() {
         return poseEstimator.getEstimatedPosition();
     }
 
+    /**
+     * Resets the pose on the field. Height and tilt aren't given, so they're kept from the current
+     * estimate and the gyro.
+     */
     public void resetPose(Pose2d currentPose) {
-        poseEstimator.resetPosition(rawGyroRotation, lastModulePositions, currentPose);
-        poseResetListener.accept(currentPose);
+        Pose3d pose3d = withGyroTilt(currentPose, getRobotPose3d().getZ());
+        poseEstimator.resetPosition(rawGyroRotation, lastModulePositions, pose3d);
+        poseResetListener.accept(pose3d);
+    }
+
+    /**
+     * A 2D pose lifted to 3D with the gyro's current pitch and roll. Resetting with zero tilt while the
+     * gyro reads some would bake that tilt into the estimator's gyro offset.
+     */
+    private Pose3d withGyroTilt(Pose2d pose, double z) {
+        return new Pose3d(
+            pose.getX(),
+            pose.getY(),
+            z,
+            new Rotation3d(rawGyroRotation.getX(), rawGyroRotation.getY(), pose.getRotation().getRadians()));
     }
 
     /**
@@ -493,7 +525,7 @@ public class DriveSubsystem extends SubsystemBase {
      *
      * @param listener receives the new pose
      */
-    public void setPoseResetListener(Consumer<Pose2d> listener) {
+    public void setPoseResetListener(Consumer<Pose3d> listener) {
         poseResetListener = listener;
     }
 

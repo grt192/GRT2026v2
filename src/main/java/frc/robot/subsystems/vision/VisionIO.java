@@ -1,7 +1,7 @@
 package frc.robot.subsystems.vision;
 
 import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import org.littletonrobotics.junction.AutoLog;
 
@@ -29,7 +29,7 @@ public interface VisionIO {
 
     default void updateInputs(VisionIOInputs inputs) {}
 
-    default void updateHeading(double timestamp, Rotation2d heading) {}
+    default void updateHeading(double timestamp, Rotation3d heading) {}
 
-    default void resetHeading(double timestamp, Rotation2d heading) {}
+    default void resetHeading(double timestamp, Rotation3d heading) {}
 }

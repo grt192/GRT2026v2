@@ -29,6 +29,16 @@ public final class VisionConstants {
     // How long a tag stays in the logged TagPoses after it was last seen
     public static final double TARGET_LOG_TIME_SECS = 0.1;
 
+    // Camera simulation (typical AprilTag camera; swap in the real calibration when known)
+    public static final int SIM_RESOLUTION_WIDTH_PX = 1280;
+    public static final int SIM_RESOLUTION_HEIGHT_PX = 800;
+    public static final double SIM_DIAGONAL_FOV_DEG = 80.0;
+    public static final double SIM_AVG_PIXEL_ERROR = 0.25;
+    public static final double SIM_PIXEL_ERROR_STD_DEV = 0.08;
+    public static final double SIM_FPS = 30.0;
+    public static final double SIM_AVG_LATENCY_MS = 35.0;
+    public static final double SIM_LATENCY_STD_DEV_MS = 5.0;
+
     // the big 3 cameras
     public static final CameraConfig CAMERA_CONFIG_1 = new CameraConfig(// climb camera
         "1",

@@ -6,7 +6,8 @@ import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.Pigeon2Configuration;
 import com.ctre.phoenix6.hardware.Pigeon2;
-import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Temperature;
@@ -37,7 +38,9 @@ public class GyroIOPigeon2 implements GyroIO {
     private final StatusSignal<Temperature> temperature;
 
     private final Queue<Double> yawPositionQueue;
-    private final Queue<Double> yawTimestampQueue;
+    private final Queue<Double> pitchPositionQueue;
+    private final Queue<Double> rollPositionQueue;
+    private final Queue<Double> timestampQueue;
 
     private static final String PIGEON_ALERT_PREFIX = "Swerve Pigeon (ID " + SwerveConstants.PIGEON_ID + "): ";
 
@@ -64,16 +67,24 @@ public class GyroIOPigeon2 implements GyroIO {
 
         temperature = pigeon.getTemperature();
 
-        // Yaw and yaw rate feed odometry, so they run at the odometry rate (250 Hz on CAN FD)
-        BaseStatusSignal.setUpdateFrequencyForAll(
-            PhoenixOdometryThread.getInstance().getFrequencyHz(), yaw, yawVelocity);
+        // Device-frame rates for latency compensating pitch/roll (the world-frame ones swap meaning
+        // as the robot yaws)
+        StatusSignal<AngularVelocity> pitchVelocityDevice = pigeon.getAngularVelocityYDevice();
+        StatusSignal<AngularVelocity> rollVelocityDevice = pigeon.getAngularVelocityXDevice();
 
-        BaseStatusSignal.setUpdateFrequencyForAll(120.0, pitch, roll, rollVelocity, pitchVelocity);
+        // Orientation and its rates feed 3D odometry, so they run at the odometry rate (250 Hz on CAN FD)
+        BaseStatusSignal.setUpdateFrequencyForAll(
+            PhoenixOdometryThread.getInstance().getFrequencyHz(),
+            yaw, yawVelocity, pitch, pitchVelocityDevice, roll, rollVelocityDevice);
+
+        BaseStatusSignal.setUpdateFrequencyForAll(120.0, rollVelocity, pitchVelocity);
         BaseStatusSignal.setUpdateFrequencyForAll(4.0, upTime, supplyVoltage, temperature);
         pigeon.optimizeBusUtilization();
 
-        yawTimestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
+        timestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
         yawPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(yaw.clone(), yawVelocity.clone());
+        pitchPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(pitch.clone(), pitchVelocityDevice.clone());
+        rollPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(roll.clone(), rollVelocityDevice.clone());
 
         refreshPigeonAlerts(BaseStatusSignal.refreshAll(
             yaw, yawVelocity, pitch, roll, rollVelocity, pitchVelocity, upTime, supplyVoltage, temperature).isOK());
@@ -99,14 +110,31 @@ public class GyroIOPigeon2 implements GyroIO {
 
         refreshPigeonAlerts(inputs.connected);
 
-        inputs.odometryYawTimestamps =
-            yawTimestampQueue.stream().mapToDouble((Double value) -> value).toArray();
-        inputs.odometryYawPositions =
-            yawPositionQueue.stream()
-                .map((Double value) -> Rotation2d.fromDegrees(value))
-                .toArray(Rotation2d[]::new);
-        yawTimestampQueue.clear();
+        // All queues are filled together by the odometry thread
+        inputs.odometryTimestamps = timestampQueue.stream().mapToDouble((Double value) -> value).toArray();
+        Double[] yaws = yawPositionQueue.toArray(new Double[0]);
+        Double[] pitches = pitchPositionQueue.toArray(new Double[0]);
+        Double[] rolls = rollPositionQueue.toArray(new Double[0]);
+        int sampleCount = Math.min(yaws.length, Math.min(pitches.length, rolls.length));
+        inputs.odometryRotations = new Rotation3d[sampleCount];
+        for (int i = 0; i < sampleCount; i++) {
+            inputs.odometryRotations[i] = toRotation3d(yaws[i], pitches[i], rolls[i]);
+        }
+        timestampQueue.clear();
         yawPositionQueue.clear();
+        pitchPositionQueue.clear();
+        rollPositionQueue.clear();
+    }
+
+    /**
+     * Pigeon yaw/pitch/roll are intrinsic Z-Y-X Euler angles in degrees, CCW+ about each axis, which is
+     * the same composition as WPILib's Rotation3d(roll, pitch, yaw).
+     */
+    static Rotation3d toRotation3d(double yawDeg, double pitchDeg, double rollDeg) {
+        return new Rotation3d(
+            Units.degreesToRadians(rollDeg),
+            Units.degreesToRadians(pitchDeg),
+            Units.degreesToRadians(yawDeg));
     }
 
     private void refreshPigeonAlerts(boolean connected) {

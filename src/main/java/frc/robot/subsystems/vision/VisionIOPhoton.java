@@ -1,6 +1,6 @@
 package frc.robot.subsystems.vision;
 
-import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -11,7 +11,7 @@ import org.photonvision.targeting.PhotonPipelineResult;
 import org.photonvision.targeting.PhotonTrackedTarget;
 
 public class VisionIOPhoton implements VisionIO {
-    private final PhotonCamera cam;
+    protected final PhotonCamera cam;
     private final PhotonPoseEstimator poseEstimator;
 
     public VisionIOPhoton(CameraConfig camConfig) {
@@ -76,12 +76,12 @@ public class VisionIOPhoton implements VisionIO {
     }
 
     @Override
-    public void updateHeading(double timestamp, Rotation2d heading) {
+    public void updateHeading(double timestamp, Rotation3d heading) {
         poseEstimator.addHeadingData(timestamp, heading);
     }
 
     @Override
-    public void resetHeading(double timestamp, Rotation2d heading) {
+    public void resetHeading(double timestamp, Rotation3d heading) {
         poseEstimator.resetHeadingData(timestamp, heading);
     }
 }

@@ -201,6 +201,12 @@ public final class Constants {
         // Modules X-lock after the drivetrain has been commanded to zero for this long
         public static final double LOCK_TIMEOUT_SECONDS = 1.0;
 
+        // How much the pose estimator trusts odometry vs vision (smaller = trust odometry more, so vision
+        // nudges the pose instead of yanking it). 6328's 2025 values; they're 2D, so z reuses xy
+        public static final double ODOMETRY_XY_STD_DEV_M = 0.003;
+        public static final double ODOMETRY_Z_STD_DEV_M = 0.003;
+        public static final double ODOMETRY_THETA_STD_DEV_RAD = 0.002;
+
         // Odometry sample rate on a CAN FD bus; non-FD buses fall back to 100 Hz
         public static final double ODOMETRY_FREQUENCY_FD_HZ = 250.0;
         public static final double ODOMETRY_FREQUENCY_HZ = 100.0;

@@ -9,7 +9,8 @@ import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.cscore.MjpegServer;
 import edu.wpi.first.cscore.UsbCamera;
 import edu.wpi.first.util.PixelFormat;
-import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Pose3d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import org.littletonrobotics.junction.Logger;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
@@ -78,6 +79,7 @@ import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionCamera;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOPhoton;
+import frc.robot.subsystems.vision.VisionIOPhotonSim;
 import frc.robot.subsystems.vision.VisionSubsystem;
 import frc.robot.subsystems.vision.TimestampedVisionUpdate;
 import frc.robot.util.LoggedCanivore;
@@ -161,7 +163,14 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIOTalonFXSim(mechCan));
                 flywheel = new FlywheelSubsystem(new FlywheelIOTalonFXSim(mechCan));
                 hood = new HoodSubsystem(new HoodIOTalonFXSim(mechCan));
-                vision = createVision(new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
+                // Cameras see the physics sim's true pose; without swerve there is nothing to drive around
+                Supplier<Pose3d> truePose = () -> swerveDriveSim != null
+                    ? swerveDriveSim.getPose3d()
+                    : new Pose3d(Constants.SwerveConstants.STARTING_POSE);
+                vision = createVision(
+                    new VisionIOPhotonSim(VisionConstants.CAMERA_CONFIG_1, truePose),
+                    new VisionIOPhotonSim(VisionConstants.CAMERA_CONFIG_2, truePose),
+                    new VisionIOPhotonSim(VisionConstants.CAMERA_CONFIG_3, truePose));
                 break;
             case REPLAY:
             default:
@@ -179,7 +188,7 @@ public class RobotContainer {
                 vision.resetHeading(Timer.getTimestamp(), pose.getRotation());
                 // Move the simulated robot along with the odometry so they stay in agreement
                 if (swerveDriveSim != null) {
-                    swerveDriveSim.teleport(pose);
+                    swerveDriveSim.teleport(pose.toPose2d());
                 }
             });
             // The sim robot spawns at the starting pose, so start odometry there too
@@ -228,7 +237,7 @@ public class RobotContainer {
             case SIM:
                 swerveDriveSim = new SwerveDriveSim(SwerveConstants.STARTING_POSE);
                 DriveSubsystem simSwerve = new DriveSubsystem(
-                    new GyroIOPigeon2Sim(swerveCan, swerveDriveSim.getGyro()),
+                    new GyroIOPigeon2Sim(swerveCan, swerveDriveSim),
                     new ModuleIOTalonFXSim(SwerveModule.FL, SwerveConstants.FL_DRIVE, SwerveConstants.FL_STEER,
                         SwerveConstants.FL_ENCODER, SwerveConstants.FL_ENCODER_OFFSET_ROT, swerveCan,
                         swerveDriveSim.getModule(SwerveModule.FL)),
@@ -260,9 +269,9 @@ public class RobotContainer {
             ? swerveSubsystem::addVisionMeasurements
             : (update) -> {
             };
-        Supplier<Rotation2d> visionHeadingSupplier = hasSwerve
-            ? () -> swerveSubsystem.getRobotPosition().getRotation()
-            : () -> Rotation2d.kZero;
+        Supplier<Rotation3d> visionHeadingSupplier = hasSwerve
+            ? () -> swerveSubsystem.getRobotPose3d().getRotation()
+            : () -> Rotation3d.kZero;
 
         return new VisionSubsystem(
             visionConsumer,
@@ -275,7 +284,7 @@ public class RobotContainer {
     /** Call from {@link Robot#simulationPeriodic()}. */
     public void simulationPeriodic() {
         if (swerveDriveSim != null) {
-            Logger.recordOutput("Swerve/SimGroundTruthPose", swerveDriveSim.getPose());
+            Logger.recordOutput("Swerve/SimGroundTruthPose", swerveDriveSim.getPose3d());
         }
     }
 
