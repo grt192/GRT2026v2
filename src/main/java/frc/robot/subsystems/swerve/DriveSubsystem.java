@@ -2,15 +2,12 @@ package frc.robot.subsystems.swerve;
 
 import static frc.robot.Constants.SwerveConstants.*;
 
+import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.config.PIDConstants;
-import com.pathplanner.lib.config.RobotConfig;
-import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -22,12 +19,10 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.Constants.Mode;
-import frc.robot.subsystems.vision.TimestampedVisionUpdate;
 import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
 
@@ -124,15 +119,13 @@ public class DriveSubsystem extends SubsystemBase {
             lastModulePositions,
             Pose3d.kZero,
             VecBuilder.fill(ODOMETRY_XY_STD_DEV_M, ODOMETRY_XY_STD_DEV_M, ODOMETRY_Z_STD_DEV_M, ODOMETRY_THETA_STD_DEV_RAD),
-            // Placeholder: every vision measurement brings its own std devs (see VisionCamera)
+            // Unused: nothing feeds vision into the estimator, it's only here for its pose history
             VecBuilder.fill(0.9, 0.9, 0.9, 0.9));
 
         // Sim feeds odometry one sample per loop instead (see ModuleIOTalonFXSim)
         if (Constants.CURRENT_MODE == Mode.REAL) {
             PhoenixOdometryThread.getInstance().start();
         }
-
-        buildAuton();
     }
 
     @Override
@@ -415,12 +408,6 @@ public class DriveSubsystem extends SubsystemBase {
         modules[3].setModuleState(new SwerveModuleState(0.0, new Rotation2d(Math.PI / 4.0)));
     }
 
-    public void addVisionMeasurements(TimestampedVisionUpdate update) {
-        poseEstimator.addVisionMeasurement(
-            update.pose(),
-            update.timestamp(),
-            update.stdDevs());
-    }
 
     /**
      * Gets the module positions.
@@ -490,6 +477,14 @@ public class DriveSubsystem extends SubsystemBase {
     @AutoLogOutput(key = "Swerve/EstimatedPose")
     public Pose2d getRobotPosition() {
         return poseEstimator.getEstimatedPosition().toPose2d();
+    }
+
+    /**
+     * Where odometry thinks the robot was at a past timestamp, so a camera frame can be lined up with
+     * the robot pose it was taken from. Empty if the timestamp is older than the pose history.
+     */
+    public Optional<Pose2d> getRobotPositionAt(double timestamp) {
+        return poseEstimator.sampleAt(timestamp).map(Pose3d::toPose2d);
     }
 
     /** Gets the full 3D pose estimate, including height and tilt (e.g. on a BUMP). */
@@ -583,38 +578,5 @@ public class DriveSubsystem extends SubsystemBase {
      */
     public double getDriveSpeedLimit() {
         return driveSpeedLimit;
-    }
-
-    /**
-     * Builds the auton builder
-     */
-    private void buildAuton() {
-        RobotConfig config = null;
-        try {
-            config = RobotConfig.fromGUISettings();
-        } catch (Exception e) {
-            e.printStackTrace();
-            // Handle exception as needed, maybe use default values or fallback
-        }
-
-        AutoBuilder.configure(
-            this::getRobotPosition,
-            this::resetPose,
-            this::getRobotRelativeChassisSpeeds,
-            (speeds, feedforwards) -> setRobotRelativeDrivePowers(speeds),
-
-            new PPHolonomicDriveController(
-                new PIDConstants(AUTO_TRANSLATION_P, AUTO_TRANSLATION_I, AUTO_TRANSLATION_D),
-                new PIDConstants(AUTO_ROTATION_P, AUTO_ROTATION_I, AUTO_ROTATION_D)),
-
-            config,
-            () -> {
-                var alliance = DriverStation.getAlliance();
-                if (alliance.isPresent()) {
-                    return alliance.get() == DriverStation.Alliance.Red;
-                }
-                return false;
-            },
-            this);
     }
 }

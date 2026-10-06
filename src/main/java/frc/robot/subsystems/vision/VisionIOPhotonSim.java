@@ -17,9 +17,8 @@ public class VisionIOPhotonSim extends VisionIOPhoton {
     private final Supplier<Pose3d> truePoseSupplier;
 
     /**
-     * @param truePoseSupplier where the robot actually is (the physics sim's pose, not odometry), so
-     *        vision can correct odometry drift like it does on the field. 3D so the cameras tilt and
-     *        rise with the robot on the BUMPs
+     * @param truePoseSupplier where the robot actually is (the physics sim's pose, not odometry). 3D so
+     *        the cameras tilt and rise with the robot on the BUMPs
      */
     public VisionIOPhotonSim(CameraConfig camConfig, Supplier<Pose3d> truePoseSupplier) {
         super(camConfig);
@@ -41,9 +40,9 @@ public class VisionIOPhotonSim extends VisionIOPhoton {
         cameraSim.enableProcessedStream(false);
 
         // One sim per camera, so each camera is rendered once per loop
-        visionSim = new VisionSystemSim(camConfig.getCameraName());
+        visionSim = new VisionSystemSim(camConfig.cameraName());
         visionSim.addAprilTags(VisionConstants.FIELD_LAYOUT);
-        visionSim.addCamera(cameraSim, camConfig.getCameraPose());
+        visionSim.addCamera(cameraSim, camConfig.robotToCamera());
     }
 
     @Override

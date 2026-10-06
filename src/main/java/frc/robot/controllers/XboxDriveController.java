@@ -8,7 +8,7 @@ import frc.robot.util.PS5ControllerEmulator;
 
 /**
  * A single Xbox controller on port 0. Buttons sit in the same spots as on {@link PS5DriveController}
- * (A = cross, X = square, Y = triangle, Start = options, LT = L2).
+ * (A = cross, Y = triangle).
  *
  * <p>
  * Reads through {@link PS5ControllerEmulator}, which handles macOS reporting the Xbox axes in a
@@ -18,10 +18,7 @@ import frc.robot.util.PS5ControllerEmulator;
 public class XboxDriveController extends BaseDriveController {
 
     private final PS5ControllerEmulator driveController = new PS5ControllerEmulator(0);
-    private final Trigger leftBumper = driveController.L1();
-    private final Trigger rightBumper = driveController.R1();
     private final Trigger a = driveController.cross();
-    private final Trigger x = driveController.square();
     private double deadZone = 0;
 
     // Deadbands are rescaled, so output ramps up from 0 at the edge of the deadband instead of jumping
@@ -47,43 +44,8 @@ public class XboxDriveController extends BaseDriveController {
     }
 
     @Override
-    public boolean getLeftBumper() {
-        return leftBumper.getAsBoolean();
-    }
-
-    @Override
-    public boolean getRightBumper() {
-        return rightBumper.getAsBoolean();
-    }
-
-    @Override
-    public double getLeftTriggerAxis() {
-        return driveController.getL2Axis();
-    }
-
-    @Override
-    public double getRightTriggerAxis() {
-        return driveController.getR2Axis();
-    }
-
-    @Override
-    public Trigger getAimToHub() {
+    public Trigger getAlignToTag() {
         return driveController.triangle();
-    }
-
-    @Override
-    public Trigger getHoldHoodDown() {
-        return driveController.L2();
-    }
-
-    @Override
-    public Trigger getForceIntakeIn() {
-        return x;
-    }
-
-    @Override
-    public Trigger getResetPose() {
-        return driveController.options();
     }
 
     @Override
@@ -95,15 +57,5 @@ public class XboxDriveController extends BaseDriveController {
     @Override
     public void setDeadZone(double deadZone) {
         this.deadZone = deadZone;
-    }
-
-    @Override
-    public Trigger getAlignToReef() {
-        return x;
-    }
-
-    @Override
-    public Trigger getAlignToSource() {
-        return a;
     }
 }

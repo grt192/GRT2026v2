@@ -3,13 +3,9 @@ package frc.robot.subsystems.vision;
 import java.util.ArrayList;
 import java.util.List;
 import org.littletonrobotics.junction.Logger;
-import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.Pose3d;
-import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
-import edu.wpi.first.wpilibj.Timer;
-import frc.robot.subsystems.vision.VisionIO.PoseObservation;
 import frc.robot.subsystems.vision.VisionIO.TagObservation;
 
 public class VisionCamera {
@@ -20,90 +16,44 @@ public class VisionCamera {
 
     private final Alert disconnectedAlert;
 
-    private double lastFrameTime = Double.NEGATIVE_INFINITY;
-    private List<TimestampedVisionUpdate> visionEstimates = List.of();
+    private List<TagSighting> sightings = List.of();
 
     public VisionCamera(VisionIO io, CameraConfig camConfig) {
         this.io = io;
         this.camConfig = camConfig;
-        logKey = "Vision/Camera" + camConfig.getCameraName();
+        logKey = "Vision/Camera" + camConfig.cameraName();
 
-        disconnectedAlert = new Alert("Vision Camera " + camConfig.getCameraName() + ": Disconnected", AlertType.kError);
+        disconnectedAlert = new Alert("Vision Camera " + camConfig.cameraName() + ": Disconnected", AlertType.kError);
     }
 
-    public static boolean isOnField(Pose3d pose) {
-        return (pose.getX() > VisionConstants.MIN_X_M) && (pose.getX() < VisionConstants.MAX_X_M)
-            && (pose.getY() > VisionConstants.MIN_Y_M) && (pose.getY() < VisionConstants.MAX_Y_M);
-    }
-
-    public void updateIO() {
+    /** @param robotPose where the robot is now, only used to place the logged tags on the field */
+    public void updateIO(Pose3d robotPose) {
         io.updateInputs(inputs);
         Logger.processInputs(logKey, inputs);
         disconnectedAlert.set(!inputs.connected);
 
-        updateVisionEstimates();
-    }
-
-    /** Vision estimates from the last {@link #updateIO()} call. */
-    public List<TimestampedVisionUpdate> getVisionEstimates() {
-        return visionEstimates;
-    }
-
-    private void updateVisionEstimates() {
-        List<TimestampedVisionUpdate> predictions = new ArrayList<>();
-
-        boolean hasFrames = inputs.tagObservations.length > 0;
-        if (hasFrames) {
-            lastFrameTime = Timer.getTimestamp();
-        }
-
-        for (PoseObservation obs : inputs.poseObservations) {
-            // CHANGE Z LOGIC IF FIELD HAS DIFFERENT ALTITUDES
-            if (!isOnField(obs.pose()) || Math.abs(obs.pose().getZ()) > VisionConstants.Z_TOLERANCE_M
-                || obs.tagCount() == 0) {
+        List<TagSighting> newSightings = new ArrayList<>();
+        for (TagObservation obs : inputs.tagObservations) {
+            // Ambiguous single-tag solves can flip the tag around, which would send the robot the wrong way
+            if (obs.ambiguity() > VisionConstants.MAX_AMBIGUITY) {
                 continue;
             }
-
-            // Tags from the same frame share the observation's timestamp
-            List<Pose3d> tagPoses = new ArrayList<>();
-            for (TagObservation tag : inputs.tagObservations) {
-                if (tag.timestamp() != obs.timestamp()) {
-                    continue;
-                }
-                VisionConstants.FIELD_LAYOUT.getTagPose(tag.tagId()).ifPresent(tagPoses::add);
-            }
-
-            // https://github.com/Mechanical-Advantage/RobotCode2025Public/blob/3ea1eb036b2dc06e4ecb14d98bba7f602a1cd62a/src/main/java/org/littletonrobotics/frc2025/subsystems/vision/Vision.java#L212-L234
-            double scale = (Math.pow(obs.avgTagDist(), VisionConstants.STD_DIST_PWR) / (obs.tagCount() * obs.tagCount())) * camConfig.getStdDevFactor();
-            double xyStdDev = (obs.isMultiTag() ? VisionConstants.XY_COEFF_MULTI_TAG : VisionConstants.XY_COEFF_SINGLE_TAG) * scale;
-            // Single-tag solves take rotation from the gyro, so only trust their translation in the plane
-            double zStdDev = obs.isMultiTag() ? xyStdDev : Double.POSITIVE_INFINITY;
-            double thetaStdDev = obs.isMultiTag() ? VisionConstants.THETA_COEFF * scale : Double.POSITIVE_INFINITY;
-
-            predictions.add(new TimestampedVisionUpdate(obs.timestamp(), obs.pose(), obs.isMultiTag(), VecBuilder.fill(
-                xyStdDev,
-                xyStdDev,
-                zStdDev,
-                thetaStdDev)));
-
-            Logger.recordOutput(logKey + "/LatencySecs", Timer.getTimestamp() - obs.timestamp());
-            Logger.recordOutput(logKey + "/RobotPose", obs.pose());
-            Logger.recordOutput(logKey + "/TagPoses", tagPoses.toArray(new Pose3d[0]));
+            newSightings.add(new TagSighting(
+                camConfig,
+                obs.tagId(),
+                obs.timestamp(),
+                camConfig.robotToCamera().plus(obs.cameraToTag())));
         }
+        sightings = newSightings;
 
-        // If no recent frames from this camera, clear tag poses
-        if (Timer.getTimestamp() - lastFrameTime > VisionConstants.TARGET_LOG_TIME_SECS) {
-            Logger.recordOutput(logKey + "/TagPoses", new Pose3d[] {});
-        }
-
-        visionEstimates = predictions;
+        // Placed off the robot's pose so they line up with the real tags in AdvantageScope
+        Logger.recordOutput(logKey + "/TagPoses", sightings.stream()
+            .map(sighting -> robotPose.transformBy(sighting.robotToTag()))
+            .toArray(Pose3d[]::new));
     }
 
-    public void updateHeading(double timestamp, Rotation3d heading) {
-        io.updateHeading(timestamp, heading);
-    }
-
-    public void resetHeading(double timestamp, Rotation3d heading) {
-        io.resetHeading(timestamp, heading);
+    /** Tags seen since the previous {@link #updateIO(Pose3d)} call. */
+    public List<TagSighting> getSightings() {
+        return sightings;
     }
 }

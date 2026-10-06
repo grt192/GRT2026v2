@@ -5,7 +5,6 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
@@ -28,8 +27,6 @@ import frc.robot.util.PhoenixUtil;
  * this project, you must also update the Main.java file in the project.
  */
 public class Robot extends LoggedRobot {
-    private Command autonomousCommand;
-
     private final RobotContainer robotContainer;
 
     /**
@@ -80,7 +77,7 @@ public class Robot extends LoggedRobot {
 
         DriverStation.silenceJoystickConnectionWarning(true);
 
-        // Instantiate our RobotContainer. This will perform all our button bindings, and put our autonomous chooser on the dashboard.
+        // Instantiate our RobotContainer. This will perform all our button bindings.
         robotContainer = new RobotContainer();
     }
 
@@ -121,33 +118,14 @@ public class Robot extends LoggedRobot {
     public void disabledPeriodic() {}
 
     @Override
-    public void autonomousInit() {
-        robotContainer.onAutonInit();
-        autonomousCommand = robotContainer.getAutonomousCommand();
-
-        // schedule the autonomous command
-        if (autonomousCommand != null) {
-            CommandScheduler.getInstance().schedule(autonomousCommand);
-        }
-    }
+    public void autonomousInit() {}
 
     /** This function is called periodically during autonomous. */
     @Override
     public void autonomousPeriodic() {}
 
     @Override
-    public void teleopInit() {
-        // This makes sure that the autonomous stops running when
-        // teleop starts running. If you want the autonomous to
-        // continue until interrupted by another command, remove
-        // this line or comment it out.
-        if (autonomousCommand != null) {
-            autonomousCommand.cancel();
-        }
-
-        // Reset driver heading with 90 degree offset at teleop start
-        robotContainer.onTeleopInit();
-    }
+    public void teleopInit() {}
 
     /** This function is called periodically during operator control. */
     @Override
