@@ -43,9 +43,6 @@ public class VisionSubsystem extends SubsystemBase {
     private Consumer<TimestampedVisionUpdate> visionConsumer = (x) -> {
     };
 
-    private PolynomialRegression xStdDevModel = VisionConstants.X_STD_DEV_MODEL;
-    private PolynomialRegression yStdDevModel = VisionConstants.Y_STD_DEV_MODEL;
-    private PolynomialRegression oStdDevModel = VisionConstants.O_STD_DEV_MODEL;
 
     private boolean connected;
     private Transform3d latestTransform3d = new Transform3d();
@@ -124,7 +121,9 @@ public class VisionSubsystem extends SubsystemBase {
             if (!estimatedPose.isPresent()) {
                 continue;
             }
-            Pose2d estimatedPose2d = estimatedPose.get().estimatedPose.toPose2d();
+            Pose3d estimatedPose3d = estimatedPose.get().estimatedPose;
+            Pose2d estimatedPose2d = estimatedPose3d.toPose2d();
+            double xyStdDev = VisionConstants.XY_COEFF_SINGLE_TAG * Math.pow(minDistance, VisionConstants.STD_DIST_PWR) * cameraConfig.getStdDevFactor();
 
             // double x = estimatedPose2d.getTranslation().getX();
             // double y = estimatedPose2d.getTranslation().getY();
@@ -139,11 +138,9 @@ public class VisionSubsystem extends SubsystemBase {
             visionConsumer.accept(
                 new TimestampedVisionUpdate(
                     result.getTimestampSeconds(),
-                    estimatedPose2d,
-                    VecBuilder.fill(// standard deviation matrix
-                        xStdDevModel.predict(minDistance),
-                        yStdDevModel.predict(minDistance),
-                        oStdDevModel.predict(minDistance))));
+                    estimatedPose3d,
+                    false,
+                    VecBuilder.fill(xyStdDev, xyStdDev, Double.POSITIVE_INFINITY)));
             visionPosePublisher.set(estimatedPose2d);
             Logger.recordOutput(cameraConfig.getCameraName() + " Estimated Pose", estimatedPose2d);
         }

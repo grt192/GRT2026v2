@@ -363,7 +363,7 @@ public class SwerveSubsystem extends SubsystemBase {
 
     public void addVisionMeasurements(TimestampedVisionUpdate update) {
         poseEstimator.addVisionMeasurement(
-            update.pose(),
+            update.pose().toPose2d(),
             update.timestamp(),
             update.stdDevs());
     }
