@@ -21,6 +21,7 @@ public class VisionCamera {
     private final Alert disconnectedAlert;
 
     private double lastFrameTime = Double.NEGATIVE_INFINITY;
+    private List<TimestampedVisionUpdate> visionEstimates = List.of();
 
     public VisionCamera(VisionIO io, CameraConfig camConfig) {
         this.io = io;
@@ -35,13 +36,20 @@ public class VisionCamera {
             && (pose.getY() > VisionConstants.MIN_Y_M) && (pose.getY() < VisionConstants.MAX_Y_M);
     }
 
-    public void updateInputs() {
+    public void updateIO() {
         io.updateInputs(inputs);
         Logger.processInputs(logKey, inputs);
         disconnectedAlert.set(!inputs.connected);
+
+        updateVisionEstimates();
     }
 
+    /** Vision estimates from the last {@link #updateIO()} call. */
     public List<TimestampedVisionUpdate> getVisionEstimates() {
+        return visionEstimates;
+    }
+
+    private void updateVisionEstimates() {
         List<TimestampedVisionUpdate> predictions = new ArrayList<>();
 
         boolean hasFrames = inputs.tagObservations.length > 0;
@@ -85,7 +93,7 @@ public class VisionCamera {
             Logger.recordOutput(logKey + "/TagPoses", new Pose3d[] {});
         }
 
-        return predictions;
+        visionEstimates = predictions;
     }
 
     public void updateHeading(double timestamp, Rotation2d heading) {
