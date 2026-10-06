@@ -9,9 +9,11 @@ import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.cscore.MjpegServer;
 import edu.wpi.first.cscore.UsbCamera;
 import edu.wpi.first.util.PixelFormat;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -61,11 +63,17 @@ import frc.robot.subsystems.shooter.tower.TowerSubsystem;
 import frc.robot.subsystems.swerve.AimSubsystem;
 import frc.robot.subsystems.swerve.SwerveSubsystem;
 import frc.robot.subsystems.vision.VisionConstants;
-import frc.robot.subsystems.vision.OldVisionSubsystem;
+import frc.robot.subsystems.vision.VisionCamera;
+import frc.robot.subsystems.vision.VisionIO;
+import frc.robot.subsystems.vision.VisionIOPhoton;
+import frc.robot.subsystems.vision.VisionSubsystem;
+import frc.robot.subsystems.vision.TimestampedVisionUpdate;
 import frc.robot.util.LoggedCanivore;
 import frc.robot.util.PS5ControllerEmulator;
 import frc.robot.util.TracerSentinel;
+import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 /**
  * This class is where the bulk of the robot should be declared. Since
@@ -113,12 +121,7 @@ public class RobotContainer {
 
     // private final FuelDetectionSubsystem fuelDetectionSubsystem = new FuelDetectionSubsystem(VisionConstants.FUEL_DETECTION_CONFIG);
 
-    private final OldVisionSubsystem visionSubsystem1 = new OldVisionSubsystem(
-        VisionConstants.CAMERA_CONFIG_1);
-    private final OldVisionSubsystem visionSubsystem2 = new OldVisionSubsystem(
-        VisionConstants.CAMERA_CONFIG_2);
-    private final OldVisionSubsystem visionSubsystem3 = new OldVisionSubsystem(
-        VisionConstants.CAMERA_CONFIG_3);
+    private final VisionSubsystem vision;
     private UsbCamera driverCam;
 
     private double desiredHoodSpeed = 0;
@@ -132,6 +135,15 @@ public class RobotContainer {
      * The container for the robot. Contains subsystems, OI devices, and commands.
      */
     public RobotContainer() {
+        boolean hasSwerve = Constants.SWERVE_ENABLED && swerveSubsystem != null;
+        Consumer<TimestampedVisionUpdate> visionConsumer = hasSwerve
+            ? swerveSubsystem::addVisionMeasurements
+            : (update) -> {
+            };
+        Supplier<Rotation2d> visionHeadingSupplier = hasSwerve
+            ? () -> swerveSubsystem.getRobotPosition().getRotation()
+            : () -> Rotation2d.kZero;
+
         switch (Constants.CURRENT_MODE) {
             case REAL:
                 pivot = new PivotSubsystem(new PivotIOTalonFX(mechCan));
@@ -140,6 +152,12 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIOTalonFX(mechCan));
                 flywheel = new FlywheelSubsystem(new FlywheelIOTalonFX(mechCan));
                 hood = new HoodSubsystem(new HoodIOTalonFX(mechCan));
+                vision = new VisionSubsystem(
+                    visionConsumer,
+                    visionHeadingSupplier,
+                    new VisionCamera(new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_1), VisionConstants.CAMERA_CONFIG_1),
+                    new VisionCamera(new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_2), VisionConstants.CAMERA_CONFIG_2),
+                    new VisionCamera(new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_3), VisionConstants.CAMERA_CONFIG_3));
                 break;
             case SIM:
                 pivot = new PivotSubsystem(new PivotIOTalonFXSim(mechCan));
@@ -148,6 +166,12 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIOTalonFXSim(mechCan));
                 flywheel = new FlywheelSubsystem(new FlywheelIOTalonFXSim(mechCan));
                 hood = new HoodSubsystem(new HoodIOTalonFXSim(mechCan));
+                vision = new VisionSubsystem(
+                    visionConsumer,
+                    visionHeadingSupplier,
+                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_1),
+                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_2),
+                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_3));
                 break;
             case REPLAY:
             default:
@@ -157,7 +181,17 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIO() {});
                 flywheel = new FlywheelSubsystem(new FlywheelIO() {});
                 hood = new HoodSubsystem(new HoodIO() {});
+                vision = new VisionSubsystem(
+                    visionConsumer,
+                    visionHeadingSupplier,
+                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_1),
+                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_2),
+                    new VisionCamera(new VisionIO() {}, VisionConstants.CAMERA_CONFIG_3));
                 break;
+        }
+        if (hasSwerve) {
+            swerveSubsystem.setPoseResetListener(
+                (pose) -> vision.resetHeading(Timer.getTimestamp(), pose.getRotation()));
         }
         visionStuff();
         constructController();
@@ -489,10 +523,6 @@ public class RobotContainer {
 
     // vision shit
     public void visionStuff() {
-        visionSubsystem1.setInterface(swerveSubsystem::addVisionMeasurements);
-        visionSubsystem2.setInterface(swerveSubsystem::addVisionMeasurements);
-        visionSubsystem3.setInterface(swerveSubsystem::addVisionMeasurements);
-
         // CommandScheduler.getInstance().schedule(
         // new GetCameraDisplacement(visionSubsystem1,
         // new Transform3d(

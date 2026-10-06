@@ -18,6 +18,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import java.util.function.Consumer;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
@@ -47,6 +48,8 @@ public class SwerveSubsystem extends SubsystemBase {
     };
     SwerveModuleState testState = new SwerveModuleState();
     private Pose2d estimatedPose = new Pose2d(10, 4, new Rotation2d());
+    private Consumer<Pose2d> poseResetListener = (pose) -> {
+    };
     private final SwerveDriveKinematics kinematics;
     private final SwerveDrivePoseEstimator poseEstimator;
     private Rotation2d driverHeadingOffset = new Rotation2d();
@@ -449,6 +452,16 @@ public class SwerveSubsystem extends SubsystemBase {
             getGyroHeading(),
             getModulePositions(),
             currentPose);
+        poseResetListener.accept(currentPose);
+    }
+
+    /**
+     * Sets a callback that runs every time the pose is reset (including PathPlanner's auto start reset).
+     *
+     * @param listener receives the new pose
+     */
+    public void setPoseResetListener(Consumer<Pose2d> listener) {
+        poseResetListener = listener;
     }
 
     /**
