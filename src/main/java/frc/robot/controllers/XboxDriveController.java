@@ -1,98 +1,109 @@
 package frc.robot.controllers;
 
-import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.Subsystem;
-import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import frc.robot.util.PS5ControllerEmulator;
 
 /**
- * A single Xbox controller on port 0.
+ * A single Xbox controller on port 0. Buttons sit in the same spots as on {@link PS5DriveController}
+ * (A = cross, X = square, Y = triangle, Start = options, LT = L2).
+ *
+ * <p>
+ * Reads through {@link PS5ControllerEmulator}, which handles macOS reporting the Xbox axes in a
+ * different order than WPILib's XboxController expects (plain XboxController reads the resting
+ * right trigger, -1, as the right stick, so the robot spins at full speed).
  */
 public class XboxDriveController extends BaseDriveController {
 
-    private double deadZone = 0.02;
+    private final PS5ControllerEmulator driveController = new PS5ControllerEmulator(0);
+    private final Trigger leftBumper = driveController.L1();
+    private final Trigger rightBumper = driveController.R1();
+    private final Trigger a = driveController.cross();
+    private final Trigger x = driveController.square();
+    private double deadZone = 0;
 
-    private final XboxController driveController = new XboxController(0);
-
-    private final JoystickButton aButton = new JoystickButton(driveController, XboxController.Button.kA.value);
-    private final JoystickButton bButton = new JoystickButton(driveController, XboxController.Button.kB.value);
-    private final JoystickButton xButton = new JoystickButton(driveController, XboxController.Button.kX.value);
-    private final JoystickButton yButton = new JoystickButton(driveController, XboxController.Button.kY.value);
-    private final JoystickButton lBumper = new JoystickButton(driveController, XboxController.Button.kLeftBumper.value);
-    private final JoystickButton rBumper = new JoystickButton(
-        driveController,
-        XboxController.Button.kRightBumper.value);
-    private final JoystickButton driveLStickButton = new JoystickButton(
-        driveController, XboxController.Button.kLeftStick.value);
-    private final JoystickButton driveRStickButton = new JoystickButton(
-        driveController, XboxController.Button.kRightStick.value);
+    // Deadbands are rescaled, so output ramps up from 0 at the edge of the deadband instead of jumping
 
     @Override
     public double getForwardPower() {
-        double forwardPower = -driveController.getLeftY();
-        if (Math.abs(forwardPower) > deadZone) {
-            return -driveController.getLeftY();
-        } else {
-            return 0;
-        }
+        return MathUtil.applyDeadband(-driveController.getLeftY(), deadZone);
     }
 
     @Override
     public double getLeftPower() {
-        double leftPower = -driveController.getLeftX();
-        if (Math.abs(leftPower) > deadZone) {
-            return -driveController.getLeftX();
-        } else {
-            return 0;
-        }
+        return MathUtil.applyDeadband(-driveController.getLeftX(), deadZone);
     }
 
     @Override
     public double getRotatePower() {
-        double rotatePower = -driveController.getRightX();
-        if (Math.abs(rotatePower) > deadZone) {
-            return -driveController.getRightX();
-        } else {
-            return 0;
-        }
+        return MathUtil.applyDeadband(-driveController.getRightX(), deadZone);
     }
 
     @Override
     public boolean getDriverHeadingResetButton() {
-        return aButton.getAsBoolean();
+        return a.getAsBoolean();
     }
 
     @Override
     public boolean getLeftBumper() {
-        return lBumper.getAsBoolean();
+        return leftBumper.getAsBoolean();
     }
 
     @Override
     public boolean getRightBumper() {
-        return rBumper.getAsBoolean();
+        return rightBumper.getAsBoolean();
+    }
+
+    @Override
+    public double getLeftTriggerAxis() {
+        return driveController.getL2Axis();
+    }
+
+    @Override
+    public double getRightTriggerAxis() {
+        return driveController.getR2Axis();
+    }
+
+    @Override
+    public Trigger getAimToHub() {
+        return driveController.triangle();
+    }
+
+    @Override
+    public Trigger getHoldHoodDown() {
+        return driveController.L2();
+    }
+
+    @Override
+    public Trigger getForceIntakeIn() {
+        return x;
+    }
+
+    @Override
+    public Trigger getResetPose() {
+        return driveController.options();
     }
 
     @Override
     public void bindDriverHeadingReset(
         Runnable command, Subsystem requiredSubsystem) {
-        aButton.onTrue(new InstantCommand(
-            command,
-            requiredSubsystem));
+        a.onTrue(new InstantCommand(command, requiredSubsystem));
     }
 
     @Override
     public void setDeadZone(double deadZone) {
-
+        this.deadZone = deadZone;
     }
 
     @Override
     public Trigger getAlignToReef() {
-        return (Trigger) xButton;
+        return x;
     }
 
     @Override
     public Trigger getAlignToSource() {
-        return (Trigger) aButton;
+        return a;
     }
 }

@@ -8,12 +8,12 @@ import frc.robot.subsystems.intake.roller.RollerSubsystem;
 import frc.robot.subsystems.shooter.hood.HoodSubsystem;
 import frc.robot.subsystems.shooter.tower.TowerSubsystem;
 import frc.robot.subsystems.shooter.flywheel.FlywheelSubsystem;
-import frc.robot.subsystems.swerve.SwerveSubsystem;
+import frc.robot.subsystems.swerve.DriveSubsystem;
 
 public class ShootAndLeaveAuton extends SequentialCommandGroup {
     // Link to dimensions https://firstfrc.blob.core.windows.net/frc2026/FieldAssets/2026-field-dimension-dwgs.pdf
     public ShootAndLeaveAuton(
-        SwerveSubsystem swerveSubsystem,
+        DriveSubsystem swerveSubsystem,
         FlywheelSubsystem flySubsystem,
         HoodSubsystem hoodSubsystem,
         HopperSubsystem hopperSubsystem,

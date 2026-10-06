@@ -50,6 +50,32 @@ public abstract class BaseDriveController {
 
     // public abstract boolean getAlignToReef();
 
+    /**
+     * Gets the left trigger axis.
+     *
+     * @return Value from 0.0 (not pressed) to 1.0 (fully pressed)
+     */
+    public abstract double getLeftTriggerAxis();
+
+    /**
+     * Gets the right trigger axis.
+     *
+     * @return Value from 0.0 (not pressed) to 1.0 (fully pressed)
+     */
+    public abstract double getRightTriggerAxis();
+
+    /** Held to auto-rotate toward the hub. */
+    public abstract Trigger getAimToHub();
+
+    /** Held to hold the hood down. */
+    public abstract Trigger getHoldHoodDown();
+
+    /** Held to force the intake in (pivot up + rollers stopped). */
+    public abstract Trigger getForceIntakeIn();
+
+    /** Pressed to reset the pose to the starting position. */
+    public abstract Trigger getResetPose();
+
     public abstract void bindDriverHeadingReset(
         Runnable command, Subsystem requiredSubsystem);
 

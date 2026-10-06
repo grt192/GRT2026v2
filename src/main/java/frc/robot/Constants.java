@@ -7,6 +7,8 @@ package frc.robot;
 
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.signals.InvertedValue;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.RobotBase;
@@ -60,20 +62,27 @@ public final class Constants {
     public static final boolean SWERVE_ENABLED = true;
     public static final boolean MECH_ENABLED = true;
 
+    // ==================== CONTROLLERS ====================
+
+    public static class ControllerConstants {
+        // Stick deadbands (fraction of full stick travel)
+        public static final double PS5_STICK_DEADBAND = 0.035;
+        public static final double XBOX_STICK_DEADBAND = 0.15;
+    }
+
     // ==================== DRIVETRAIN ====================
 
     public static class SwerveDriveConstants {
 
         // Motor Configuration
 
-        // Current Limits (defaults - tunable via NetworkTables)
+        // Current Limits
         public static final double DRIVE_SUPPLY_CURRENT_LIMIT = 70;
 
         public static final double DRIVE_STATOR_CURRENT_LIMIT = 200; // hardware safety cutoff
         public static final double DRIVE_PEAK_STATOR_CURRENT = 120; // max current FOC control can request
 
         public static final boolean DRIVE_CURRENT_LIMIT_ENABLE = true;
-        public static final double DRIVE_RAMP_RATE = 0.0;
 
         // Physical Measurements (
         public static final double DRIVE_WHEEL_RADIUS_METERS = 0.051; // meters
@@ -83,15 +92,19 @@ public final class Constants {
         // Measured max drive speed
         public static final double TRUE_MAX_DRIVE_SPEED = 3.87; // put robot in the air and measure from nt
 
-        // MotionMagic parameters for drive motors (tested values)
-        public static final double DRIVE_MAX_VELOCITY_RPS = 100.0; // 90
-        public static final double DRIVE_MAX_ACCELERATION = 300.0; // 170
+        // Velocity PID (VelocityTorqueCurrentFOC: amps per wheel rot/s). These were tuned against
+        // motor-rotor rot/s, so they're scaled by the gear reduction now that the TalonFX reports
+        // wheel rotations.
+        public static final double kP = 9.5 * DRIVE_GEAR_REDUCTION;
+        public static final double kI = 0.0;
+        public static final double kD = 0.1 * DRIVE_GEAR_REDUCTION;
+        public static final double kS = 0.5; // amps
+        public static final double kV = 0.12 * DRIVE_GEAR_REDUCTION;
     }
 
     public static class SwerveSteerConstants {
         // Motor Configuration
         public static final double STEER_PEAK_STATOR_CURRENT = 40;
-        public static final double STEER_RAMP_RATE = 0;
 
         // Current Limits (optimized for Kraken motors - steer needs less current)
         public static final double STEER_SUPPLY_CURRENT_LIMIT = 30; // Prevents brownouts
@@ -100,52 +113,59 @@ public final class Constants {
 
         // Physical Measurements
         public static final double STEER_GEAR_REDUCTION = 160.0 / 7.0; // ~22.86:1
-        public static final double STEER_FREE_SPEED_RPM = 7530.0; // Kraken X44
 
-        // Motion Magic (theoretical max from motor specs)
-        // 7530 RPM / 22.86 gear ratio / 60 = 5.49 rot/sec output
-        public static final double STEER_CRUISE_VELOCITY = STEER_FREE_SPEED_RPM / STEER_GEAR_REDUCTION / 60.0;
-        // 10x velocity = reach max in 0.1 sec
-        public static final double STEER_ACCELERATION = STEER_CRUISE_VELOCITY * 10.0;
+        // Position PID (PositionTorqueCurrentFOC: amps per module rotation)
+        public static final double kP = 190;
+        public static final double kI = 0;
+        public static final double kD = 7;
+        public static final double kS = 1;
+        public static final double kV = 0;
+
+    }
+
+    /** Physical model for the maple-sim drivetrain. Estimates -- update with real numbers when known. */
+    public static class SwerveSimConstants {
+        // Physics step. The CTRE sim devices run in real time, so stepping faster than the 20 ms
+        // robot loop keeps the motor controllers' closed loops stable (254 uses 5 ms too)
+        public static final double PERIOD_SECONDS = 0.005;
+
+        public static final double ROBOT_MASS_KG = 60.0; // with bumpers and battery
+        public static final double BUMPER_LENGTH_X_METERS = 0.76;
+        public static final double BUMPER_WIDTH_Y_METERS = 0.76;
+
+        public static final double WHEEL_COEFFICIENT_OF_FRICTION = 1.2;
+        public static final double DRIVE_FRICTION_VOLTS = 0.1;
+        public static final double STEER_FRICTION_VOLTS = 0.15;
+        // maple-sim's COTS module default; much smaller goes numerically unstable at a 5 ms step
+        public static final double STEER_MOMENT_OF_INERTIA_KG_M2 = 0.03;
     }
 
     public static class SwerveConstants {
-
-        // Drive PID (Velocity Control)
-        public static final double[] DRIVE_P = {9.5, 9.5, 9.5, 9.5};
-        public static final double[] DRIVE_I = {0, 0, 0, 0};
-        public static final double[] DRIVE_D = {0.1, 0.1, 0.1, 0.1};
-        public static final double[] DRIVE_S = {0.5, 0.5, 0.5, 0.5};
-        public static final double[] DRIVE_V = {0.12, 0.12, 0.12, 0.12};
-
-        // Steer PID (Position Control)
-        public static final double[] STEER_P = {190, 190, 190, 190};
-        public static final double[] STEER_I = {0, 0, 0, 0};
-        public static final double[] STEER_D = {7, 7, 7, 7};
-        public static final double[] STEER_S = {1, 1, 1, 1};
-
         // ID
         public static final int PIGEON_ID = 24;
-        // Module CAN IDs and Offsets (per README)
+        // Module CAN IDs and encoder offsets (per README)
+        // The offset is the CANcoder reading (rotations) when the wheel faces forward. The old
+        // SteerMotor/KrakenSwerveModule code read the wheel angle as (CANcoder - 0.5 rot), so 0.5
+        // keeps the same zero as before.
         public static final int FL_DRIVE = 0;
         public static final int FL_STEER = 1;
         public static final int FL_ENCODER = 8;
-        public static final double FL_OFFSET = 0;
+        public static final double FL_ENCODER_OFFSET_ROT = 0.5;
 
         public static final int FR_DRIVE = 2;
         public static final int FR_STEER = 3;
         public static final int FR_ENCODER = 9;
-        public static final double FR_OFFSET = 0;
+        public static final double FR_ENCODER_OFFSET_ROT = 0.5;
 
         public static final int BL_DRIVE = 4;
         public static final int BL_STEER = 5;
         public static final int BL_ENCODER = 10;
-        public static final double BL_OFFSET = 0;
+        public static final double BL_ENCODER_OFFSET_ROT = 0.5;
 
         public static final int BR_DRIVE = 6;
         public static final int BR_STEER = 7;
         public static final int BR_ENCODER = 11;
-        public static final double BR_OFFSET = 0;
+        public static final double BR_ENCODER_OFFSET_ROT = 0.5;
 
         // Module Positions (meters, relative to robot center)
         // WPILib: +X = front, +Y = left
@@ -166,18 +186,24 @@ public final class Constants {
         public static final double MAX_ANGULAR_ACCELERATION = 20; // how fast robot starts spinning (rad/s²)
         public static final double MAX_ANGULAR_DECELERATION = 30; // how fast robot stops spinning (rad/s²)
 
-        // Boost Mode (L1 held) bypasses the drive speed-limit multiplier and the
-        // software acceleration limiter entirely in SwerveSubsystem.setDrivePowers,
+        // Boost Mode (R2 held) bypasses the drive speed-limit multiplier and the
+        // software acceleration limiter entirely in DriveSubsystem.setDrivePowers,
         // so there are no separate boost constants -- it runs at MAX_VEL / MAX_OMEGA
         // with raw commands straight to the modules.
 
         // Slow Mode Constants (R1 held)
         public static final double SLOW_MODE_SPEED_LIMIT = 0.3; // 30% speed when R1 held
 
-        // Chassis Rotation PID (for heading lock / field-oriented rotation)
-        public static final double ROTATION_P = 4.0;
-        public static final double ROTATION_I = 0.0;
-        public static final double ROTATION_D = 0.2;
+        // Practice starting position: 1.5 meters in front of the red hub (which is at x=11.9). Also
+        // where the robot spawns in sim
+        public static final Pose2d STARTING_POSE = new Pose2d(10.4, 4.0, Rotation2d.kZero);
+
+        // Modules X-lock after the drivetrain has been commanded to zero for this long
+        public static final double LOCK_TIMEOUT_SECONDS = 1.0;
+
+        // Odometry sample rate on a CAN FD bus; non-FD buses fall back to 100 Hz
+        public static final double ODOMETRY_FREQUENCY_FD_HZ = 250.0;
+        public static final double ODOMETRY_FREQUENCY_HZ = 100.0;
 
         // PathPlanner Auto PID Constants
         public static final double AUTO_TRANSLATION_P = 1.6; // increased 4/12/26 TONY
@@ -449,7 +475,6 @@ public final class Constants {
     // ==================== LOGGING & DEBUG ====================
 
     public static class LoggingConstants {
-        public static final String SWERVE_TABLE = "SwerveStats";
         public static final String SENSOR_TABLE = "Sensors";
     }
 
@@ -498,12 +523,5 @@ public final class Constants {
 
         // Flywheel speed (RPS) - placeholder, tune on robot
         public static final double FLYWHEEL_VELO_RPS = 49.0;
-    }
-
-    public static class DebugConstants {
-        public static final boolean MASTER_DEBUG = false;
-        public static final boolean DRIVE_DEBUG = false;
-        public static final boolean STEER_DEBUG = false;
-        public static final boolean STATE_DEBUG = false;
     }
 }

@@ -21,7 +21,7 @@ import frc.robot.util.PhoenixUtil;
 
 /** IO implementation for Pigeon 2. */
 public class GyroIOPigeon2 implements GyroIO {
-    private final Pigeon2 pigeon;
+    protected final Pigeon2 pigeon;
 
     private final StatusSignal<Angle> yaw;
     private final StatusSignal<Angle> pitch;
@@ -64,16 +64,16 @@ public class GyroIOPigeon2 implements GyroIO {
 
         temperature = pigeon.getTemperature();
 
-        // FD allows bus to go at 250 Hz
-        double yawUpdateFrequency = canivore.isNetworkFD() ? 250 : 100;
-        yaw.setUpdateFrequency(yawUpdateFrequency);
+        // Yaw and yaw rate feed odometry, so they run at the odometry rate (250 Hz on CAN FD)
+        BaseStatusSignal.setUpdateFrequencyForAll(
+            PhoenixOdometryThread.getInstance().getFrequencyHz(), yaw, yawVelocity);
 
-        BaseStatusSignal.setUpdateFrequencyForAll(120.0, pitch, roll, yawVelocity, rollVelocity, pitchVelocity);
+        BaseStatusSignal.setUpdateFrequencyForAll(120.0, pitch, roll, rollVelocity, pitchVelocity);
         BaseStatusSignal.setUpdateFrequencyForAll(4.0, upTime, supplyVoltage, temperature);
         pigeon.optimizeBusUtilization();
 
         yawTimestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
-        yawPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(yaw.clone());
+        yawPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(yaw.clone(), yawVelocity.clone());
 
         refreshPigeonAlerts(BaseStatusSignal.refreshAll(
             yaw, yawVelocity, pitch, roll, rollVelocity, pitchVelocity, upTime, supplyVoltage, temperature).isOK());

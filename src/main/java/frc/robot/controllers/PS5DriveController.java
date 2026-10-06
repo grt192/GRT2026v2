@@ -75,21 +75,13 @@ public class PS5DriveController extends BaseDriveController {
         return driveController.getL2Axis() > .1;
     }
 
-    /**
-     * Gets the raw left trigger axis value.
-     *
-     * @return Value from 0.0 (not pressed) to 1.0 (fully pressed)
-     */
+    @Override
     public double getLeftTriggerAxis() {
         // L2Axis returns -1 to 1, convert to 0 to 1
         return (driveController.getL2Axis() + 1) / 2;
     }
 
-    /**
-     * Gets the raw right trigger axis value.
-     *
-     * @return Value from 0.0 (not pressed) to 1.0 (fully pressed)
-     */
+    @Override
     public double getRightTriggerAxis() {
         // R2Axis returns -1 to 1, convert to 0 to 1
         return (driveController.getR2Axis() + 1) / 2;
@@ -132,6 +124,26 @@ public class PS5DriveController extends BaseDriveController {
     @Override
     public Trigger getAlignToSource() {
         return square;
+    }
+
+    @Override
+    public Trigger getAimToHub() {
+        return driveController.triangle();
+    }
+
+    @Override
+    public Trigger getHoldHoodDown() {
+        return driveController.L2();
+    }
+
+    @Override
+    public Trigger getForceIntakeIn() {
+        return square;
+    }
+
+    @Override
+    public Trigger getResetPose() {
+        return driveController.options();
     }
 
     public CommandPS5Controller getController() {

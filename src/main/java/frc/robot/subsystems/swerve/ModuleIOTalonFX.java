@@ -13,8 +13,8 @@ import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.configs.TorqueCurrentConfigs;
-import com.ctre.phoenix6.controls.PositionVoltage;
-import com.ctre.phoenix6.controls.VelocityVoltage;
+import com.ctre.phoenix6.controls.PositionTorqueCurrentFOC;
+import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.ParentDevice;
@@ -44,20 +44,33 @@ import frc.robot.util.PIDConstants;
 import frc.robot.util.PhoenixUtil;
 
 public class ModuleIOTalonFX implements ModuleIO {
-    private final SwerveModule module;
-    private final PIDConstants defaultDrivePID;
-    private final PIDConstants defaultSteerPID;
+    // Drive kS / kV are applied by SingleModule's feedforward, not the TalonFX slot
+    private static final PIDConstants DEFAULT_DRIVE_PID = PIDConstants.ZERO
+        .withKP(SwerveDriveConstants.kP)
+        .withKI(SwerveDriveConstants.kI)
+        .withKD(SwerveDriveConstants.kD)
+        .withKS(SwerveDriveConstants.kS)
+        .withKV(SwerveDriveConstants.kV);
 
-    private final TalonFX driveMotor;
+    private static final PIDConstants DEFAULT_STEER_PID = PIDConstants.ZERO
+        .withKP(SwerveSteerConstants.kP)
+        .withKI(SwerveSteerConstants.kI)
+        .withKD(SwerveSteerConstants.kD)
+        .withKS(SwerveSteerConstants.kS)
+        .withKV(SwerveSteerConstants.kV);
+
+    private final double encoderOffsetRot;
+
+    protected final TalonFX driveMotor;
     private final Slot0Configs drivePIDConfig;
 
-    private final TalonFX steerMotor;
+    protected final TalonFX steerMotor;
     private final Slot0Configs steerPIDConfig;
 
-    private final CANcoder steerEncoder;
+    protected final CANcoder steerEncoder;
 
-    private final PositionVoltage positionControl = new PositionVoltage(0.0).withEnableFOC(true);
-    private final VelocityVoltage velocityControl = new VelocityVoltage(0.0).withEnableFOC(true);
+    private final PositionTorqueCurrentFOC positionControl = new PositionTorqueCurrentFOC(0.0);
+    private final VelocityTorqueCurrentFOC velocityControl = new VelocityTorqueCurrentFOC(0.0);
     private final VoltageOut voltageControl = new VoltageOut(0.0).withEnableFOC(true);
 
     private final List<BaseStatusSignal> driveSignals;
@@ -122,10 +135,18 @@ public class ModuleIOTalonFX implements ModuleIO {
     private final Alert failedToSetOdometrySignalFrequencyAlert;
     private final Alert didNotOptimizeCanBusesAlert;
 
-    public ModuleIOTalonFX(SwerveModule module, int driveMotorID, int steerMotorID, int cancoderID, LoggedCanivore canivore, PIDConstants drivePID, PIDConstants steerPID) {
-        this.module = module;
-        this.defaultDrivePID = drivePID;
-        this.defaultSteerPID = steerPID;
+    /**
+     * @param encoderOffsetRot CANcoder reading (rotations) when the wheel faces forward. Applied
+     *        here rather than written to the CANcoder's magnet offset, so the device config is untouched.
+     */
+    public ModuleIOTalonFX(
+        SwerveModule module,
+        int driveMotorID,
+        int steerMotorID,
+        int cancoderID,
+        double encoderOffsetRot,
+        LoggedCanivore canivore) {
+        this.encoderOffsetRot = encoderOffsetRot;
 
         String drivePrefix = "Swerve Drive Motor (ID " + driveMotorID + ", " + module + "): ";
         String steerPrefix = "Swerve Steer Motor (ID " + steerMotorID + ", " + module + "): ";
@@ -206,9 +227,9 @@ public class ModuleIOTalonFX implements ModuleIO {
         driveConfig.withFeedback(new FeedbackConfigs()
             .withSensorToMechanismRatio(SwerveDriveConstants.DRIVE_GEAR_REDUCTION));
         drivePIDConfig = new Slot0Configs()
-            .withKP(defaultDrivePID.kP())
-            .withKI(defaultDrivePID.kI())
-            .withKD(defaultDrivePID.kD());
+            .withKP(getDefaultDrivePID().kP())
+            .withKI(getDefaultDrivePID().kI())
+            .withKD(getDefaultDrivePID().kD());
         driveConfig.withSlot0(drivePIDConfig);
         tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig), failedToConfigureDrive);
 
@@ -231,11 +252,11 @@ public class ModuleIOTalonFX implements ModuleIO {
         steerConfig.withClosedLoopGeneral(new ClosedLoopGeneralConfigs()
             .withContinuousWrap(true));
         steerPIDConfig = new Slot0Configs()
-            .withKP(defaultSteerPID.kP())
-            .withKI(defaultSteerPID.kI())
-            .withKD(defaultSteerPID.kD())
-            .withKS(defaultSteerPID.kS())
-            .withKV(defaultSteerPID.kV());
+            .withKP(getDefaultSteerPID().kP())
+            .withKI(getDefaultSteerPID().kI())
+            .withKD(getDefaultSteerPID().kD())
+            .withKS(getDefaultSteerPID().kS())
+            .withKV(getDefaultSteerPID().kV());
         steerConfig.withSlot0(steerPIDConfig);
         tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig), failedToConfigureSteer);
 
@@ -260,7 +281,8 @@ public class ModuleIOTalonFX implements ModuleIO {
         driveAppliedDutyCycle = driveMotor.getDutyCycle(false);
         driveClosedLoopSetpoint = driveMotor.getClosedLoopReference(false);
         driveClosedLoopOutput = driveMotor.getClosedLoopOutput(false);
-        drivePositionQueue = PhoenixOdometryThread.getInstance().registerSignal(driveMotor.getPosition(false).clone());
+        drivePositionQueue = PhoenixOdometryThread.getInstance()
+            .registerSignal(drivePosition.clone(), driveVelocity.clone());
 
         driveSignals = List.of(
             drivePosition,
@@ -290,7 +312,8 @@ public class ModuleIOTalonFX implements ModuleIO {
         steerAppliedDutyCycle = steerMotor.getDutyCycle(false);
         steerClosedLoopSetpoint = steerMotor.getClosedLoopReference(false);
         steerClosedLoopOutput = steerMotor.getClosedLoopOutput(false);
-        steerPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(steerMotor.getPosition(false).clone());
+        steerPositionQueue = PhoenixOdometryThread.getInstance()
+            .registerSignal(steerPosition.clone(), steerVelocity.clone());
 
         steerSignals = List.of(
             steerPosition,
@@ -311,7 +334,7 @@ public class ModuleIOTalonFX implements ModuleIO {
         cancoderHealth = steerEncoder.getMagnetHealth(false);
         cancoderSignals = List.of(cancoderAbsolutePosition, cancoderHealth);
 
-        odometrySignals = List.of(drivePosition, steerPosition);
+        odometrySignals = List.of(drivePosition, driveVelocity, steerPosition, steerVelocity);
 
         tryUntilOk(
             5,
@@ -327,7 +350,8 @@ public class ModuleIOTalonFX implements ModuleIO {
             failedToSetCancoderSignalFrequencyAlert);
         tryUntilOk(
             5,
-            () -> BaseStatusSignal.setUpdateFrequencyForAll(250, odometrySignals),
+            () -> BaseStatusSignal.setUpdateFrequencyForAll(
+                PhoenixOdometryThread.getInstance().getFrequencyHz(), odometrySignals),
             failedToSetOdometrySignalFrequencyAlert);
         tryUntilOk(
             5,
@@ -363,7 +387,7 @@ public class ModuleIOTalonFX implements ModuleIO {
         inputs.driveClosedLoopSetpoint = driveClosedLoopSetpoint.getValue();
         inputs.driveClosedLoopOutput = driveClosedLoopOutput.getValue();
 
-        inputs.steerPositionRot = steerPosition.getValueAsDouble();
+        inputs.steerPositionRot = steerPosition.getValueAsDouble() - encoderOffsetRot;
         inputs.steerVelocityRPS = steerVelocity.getValueAsDouble();
         inputs.steerAccelerationRPS2 = steerAcceleration.getValueAsDouble();
         inputs.steerAppliedVolts = steerAppliedVoltage.getValueAsDouble();
@@ -376,15 +400,17 @@ public class ModuleIOTalonFX implements ModuleIO {
 
         inputs.steerControlMode = PhoenixUtil.toMotorControlMode(steerControlMode.getValue());
         inputs.steerAppliedDutyCycle = steerAppliedDutyCycle.getValue();
-        inputs.steerClosedLoopSetpoint = steerClosedLoopSetpoint.getValue();
+        inputs.steerClosedLoopSetpoint = steerClosedLoopSetpoint.getValue() - encoderOffsetRot;
         inputs.steerClosedLoopOutput = steerClosedLoopOutput.getValue();
 
-        inputs.encoderAbsolutePositionRot = cancoderAbsolutePosition.getValueAsDouble();
+        inputs.encoderAbsolutePositionRot = cancoderAbsolutePosition.getValueAsDouble() - encoderOffsetRot;
         inputs.encoderHealth = PhoenixUtil.toEncoderHealth(cancoderHealth.getValue());
         inputs.encoderConnected = BaseStatusSignal.isAllGood(cancoderSignals);
 
         inputs.odometryDrivePositionsRads = drivePositionQueue.stream().mapToDouble(Units::rotationsToRadians).toArray();
-        inputs.odometrySteerPositions = steerPositionQueue.stream().map(Rotation2d::fromRotations).toArray(Rotation2d[]::new);
+        inputs.odometrySteerPositions = steerPositionQueue.stream()
+            .map((Double value) -> Rotation2d.fromRotations(value - encoderOffsetRot))
+            .toArray(Rotation2d[]::new);
         drivePositionQueue.clear();
         steerPositionQueue.clear();
 
@@ -395,22 +421,17 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     @Override
     public PIDConstants getDefaultDrivePID() {
-        return defaultDrivePID;
+        return DEFAULT_DRIVE_PID;
     }
 
     @Override
     public PIDConstants getDefaultSteerPID() {
-        return defaultSteerPID;
+        return DEFAULT_STEER_PID;
     }
 
     @Override
-    public SwerveModule getModule() {
-        return module;
-    }
-
-    @Override
-    public void setDriveVelocity(double velocityRPS, double feedforwardVolts) {
-        driveMotor.setControl(velocityControl.withVelocity(velocityRPS).withFeedForward(feedforwardVolts));
+    public void setDriveVelocity(double velocityRPS, double feedforwardAmps) {
+        driveMotor.setControl(velocityControl.withVelocity(velocityRPS).withFeedForward(feedforwardAmps));
     }
 
     @Override
@@ -425,7 +446,7 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     @Override
     public void setSteerPosition(double positionRot) {
-        steerMotor.setControl(positionControl.withPosition(positionRot));
+        steerMotor.setControl(positionControl.withPosition(positionRot + encoderOffsetRot));
     }
 
     @Override

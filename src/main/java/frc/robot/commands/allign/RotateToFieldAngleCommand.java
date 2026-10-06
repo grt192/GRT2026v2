@@ -6,11 +6,11 @@ import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Constants.RotateToAngleConstants;
-import frc.robot.subsystems.swerve.SwerveSubsystem;
+import frc.robot.subsystems.swerve.DriveSubsystem;
 import java.util.function.BooleanSupplier;
 
 public class RotateToFieldAngleCommand extends Command {
-    private final SwerveSubsystem swerve;
+    private final DriveSubsystem swerve;
     private final PIDController pid;
     private final double targetDegrees;
     private final BooleanSupplier cancelCondition;
@@ -27,7 +27,7 @@ public class RotateToFieldAngleCommand extends Command {
 
     private static boolean initialized = false;
 
-    public RotateToFieldAngleCommand(SwerveSubsystem swerve, double targetDegrees, BooleanSupplier cancelCondition) {
+    public RotateToFieldAngleCommand(DriveSubsystem swerve, double targetDegrees, BooleanSupplier cancelCondition) {
         this.swerve = swerve;
         this.targetDegrees = targetDegrees;
 

@@ -10,6 +10,7 @@ import edu.wpi.first.cscore.MjpegServer;
 import edu.wpi.first.cscore.UsbCamera;
 import edu.wpi.first.util.PixelFormat;
 import edu.wpi.first.math.geometry.Rotation2d;
+import org.littletonrobotics.junction.Logger;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -24,8 +25,10 @@ import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.CANType;
+import frc.robot.Constants.ControllerConstants;
 import frc.robot.Constants.CycleShooterConstants;
 import frc.robot.Constants.Mode;
+import frc.robot.Constants.SwerveConstants;
 import frc.robot.Constants.ShooterConstants.Flywheel;
 import frc.robot.commands.AutonShooterSequence;
 import frc.robot.commands.CycleShot;
@@ -34,7 +37,9 @@ import frc.robot.commands.TowerShot;
 import frc.robot.commands.allign.AimToHubCommand;
 import frc.robot.commands.auton.ShootAndLeaveAuton;
 import frc.robot.commands.intake.PivotAndRollerIntakeCommand;
+import frc.robot.controllers.BaseDriveController;
 import frc.robot.controllers.PS5DriveController;
+import frc.robot.controllers.XboxDriveController;
 import frc.robot.subsystems.fms.FieldManagementSubsystem;
 import frc.robot.subsystems.hopper.HopperIO;
 import frc.robot.subsystems.hopper.HopperIOTalonFX;
@@ -60,8 +65,15 @@ import frc.robot.subsystems.shooter.tower.TowerIO;
 import frc.robot.subsystems.shooter.tower.TowerIOTalonFX;
 import frc.robot.subsystems.shooter.tower.TowerIOTalonFXSim;
 import frc.robot.subsystems.shooter.tower.TowerSubsystem;
-import frc.robot.subsystems.swerve.AimSubsystem;
-import frc.robot.subsystems.swerve.SwerveSubsystem;
+import frc.robot.subsystems.swerve.DriveSubsystem;
+import frc.robot.subsystems.swerve.DriveSubsystem.SwerveModule;
+import frc.robot.subsystems.swerve.GyroIO;
+import frc.robot.subsystems.swerve.GyroIOPigeon2;
+import frc.robot.subsystems.swerve.ModuleIO;
+import frc.robot.subsystems.swerve.ModuleIOTalonFX;
+import frc.robot.subsystems.swerve.GyroIOPigeon2Sim;
+import frc.robot.subsystems.swerve.ModuleIOTalonFXSim;
+import frc.robot.subsystems.swerve.SwerveDriveSim;
 import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionCamera;
 import frc.robot.subsystems.vision.VisionIO;
@@ -94,12 +106,14 @@ public class RobotContainer {
     private DoubleSupplier cycleFlywheelOffsetGetter = () -> (cycleFlywheelVelo - CycleShooterConstants.FLYWHEEL_VELO_RPS);
 
     private final SendableChooser<Command> autoChooser = new SendableChooser<>();
-    private PS5DriveController driveController;
+    private BaseDriveController driveController;
     private CommandPS5Controller mechController;
     private final LoggedCanivore swerveCan = new LoggedCanivore(CANType.SWERVE);
     private final LoggedCanivore mechCan = new LoggedCanivore(CANType.MECH);
 
-    private SwerveSubsystem swerveSubsystem = Constants.SWERVE_ENABLED ? new SwerveSubsystem(swerveCan) : null;
+    private final DriveSubsystem swerveSubsystem;
+    // Physics for the drivetrain, only in sim
+    private SwerveDriveSim swerveDriveSim = null;
     private final FieldManagementSubsystem fmsSubsystem = new FieldManagementSubsystem(cycleFlywheelOffsetGetter);
     private final Field2d field = new Field2d();
 
@@ -109,15 +123,7 @@ public class RobotContainer {
     private final TowerSubsystem tower;
     private final FlywheelSubsystem flywheel;
     private final HoodSubsystem hood;
-    @SuppressWarnings("unused")
-    private final AimSubsystem aimSubsystem =
-        (Constants.SWERVE_ENABLED && swerveSubsystem != null)
-            ? new AimSubsystem(swerveSubsystem, fmsSubsystem)
-            : null;
-    private final AimToHubCommand aimHelper =
-        (Constants.SWERVE_ENABLED && swerveSubsystem != null)
-            ? new AimToHubCommand(swerveSubsystem, fmsSubsystem)
-            : null;
+    private final AimToHubCommand aimHelper;
 
     private final VisionSubsystem vision;
     private UsbCamera driverCam;
@@ -131,6 +137,10 @@ public class RobotContainer {
      * The container for the robot. Contains subsystems, OI devices, and commands.
      */
     public RobotContainer() {
+        // Swerve is built first: vision and the aim helpers need it
+        swerveSubsystem = Constants.SWERVE_ENABLED ? createSwerve() : null;
+        aimHelper = swerveSubsystem != null ? new AimToHubCommand(swerveSubsystem, fmsSubsystem) : null;
+
         switch (Constants.CURRENT_MODE) {
             case REAL:
                 pivot = new PivotSubsystem(new PivotIOTalonFX(mechCan));
@@ -165,8 +175,17 @@ public class RobotContainer {
                 break;
         }
         if (Constants.SWERVE_ENABLED && swerveSubsystem != null) {
-            swerveSubsystem.setPoseResetListener(
-                (pose) -> vision.resetHeading(Timer.getTimestamp(), pose.getRotation()));
+            swerveSubsystem.setPoseResetListener((pose) -> {
+                vision.resetHeading(Timer.getTimestamp(), pose.getRotation());
+                // Move the simulated robot along with the odometry so they stay in agreement
+                if (swerveDriveSim != null) {
+                    swerveDriveSim.teleport(pose);
+                }
+            });
+            // The sim robot spawns at the starting pose, so start odometry there too
+            if (swerveDriveSim != null) {
+                swerveSubsystem.resetToStartingPosition();
+            }
         }
         constructController();
         configureBindings();
@@ -193,6 +212,48 @@ public class RobotContainer {
         NamedCommands.registerCommand("shootSequence", new AutonShooterSequence(flywheel, hood, tower, hopper, pivot));
     }
 
+    private DriveSubsystem createSwerve() {
+        switch (Constants.CURRENT_MODE) {
+            case REAL:
+                return new DriveSubsystem(
+                    new GyroIOPigeon2(swerveCan),
+                    new ModuleIOTalonFX(SwerveModule.FL, SwerveConstants.FL_DRIVE, SwerveConstants.FL_STEER,
+                        SwerveConstants.FL_ENCODER, SwerveConstants.FL_ENCODER_OFFSET_ROT, swerveCan),
+                    new ModuleIOTalonFX(SwerveModule.FR, SwerveConstants.FR_DRIVE, SwerveConstants.FR_STEER,
+                        SwerveConstants.FR_ENCODER, SwerveConstants.FR_ENCODER_OFFSET_ROT, swerveCan),
+                    new ModuleIOTalonFX(SwerveModule.BL, SwerveConstants.BL_DRIVE, SwerveConstants.BL_STEER,
+                        SwerveConstants.BL_ENCODER, SwerveConstants.BL_ENCODER_OFFSET_ROT, swerveCan),
+                    new ModuleIOTalonFX(SwerveModule.BR, SwerveConstants.BR_DRIVE, SwerveConstants.BR_STEER,
+                        SwerveConstants.BR_ENCODER, SwerveConstants.BR_ENCODER_OFFSET_ROT, swerveCan));
+            case SIM:
+                swerveDriveSim = new SwerveDriveSim(SwerveConstants.STARTING_POSE);
+                DriveSubsystem simSwerve = new DriveSubsystem(
+                    new GyroIOPigeon2Sim(swerveCan, swerveDriveSim.getGyro()),
+                    new ModuleIOTalonFXSim(SwerveModule.FL, SwerveConstants.FL_DRIVE, SwerveConstants.FL_STEER,
+                        SwerveConstants.FL_ENCODER, SwerveConstants.FL_ENCODER_OFFSET_ROT, swerveCan,
+                        swerveDriveSim.getModule(SwerveModule.FL)),
+                    new ModuleIOTalonFXSim(SwerveModule.FR, SwerveConstants.FR_DRIVE, SwerveConstants.FR_STEER,
+                        SwerveConstants.FR_ENCODER, SwerveConstants.FR_ENCODER_OFFSET_ROT, swerveCan,
+                        swerveDriveSim.getModule(SwerveModule.FR)),
+                    new ModuleIOTalonFXSim(SwerveModule.BL, SwerveConstants.BL_DRIVE, SwerveConstants.BL_STEER,
+                        SwerveConstants.BL_ENCODER, SwerveConstants.BL_ENCODER_OFFSET_ROT, swerveCan,
+                        swerveDriveSim.getModule(SwerveModule.BL)),
+                    new ModuleIOTalonFXSim(SwerveModule.BR, SwerveConstants.BR_DRIVE, SwerveConstants.BR_STEER,
+                        SwerveConstants.BR_ENCODER, SwerveConstants.BR_ENCODER_OFFSET_ROT, swerveCan,
+                        swerveDriveSim.getModule(SwerveModule.BR)));
+                swerveDriveSim.start();
+                return simSwerve;
+            case REPLAY:
+            default:
+                return new DriveSubsystem(
+                    new GyroIO() {},
+                    new ModuleIO() {},
+                    new ModuleIO() {},
+                    new ModuleIO() {},
+                    new ModuleIO() {});
+        }
+    }
+
     private VisionSubsystem createVision(VisionIO io1, VisionIO io2, VisionIO io3) {
         boolean hasSwerve = Constants.SWERVE_ENABLED && swerveSubsystem != null;
         Consumer<TimestampedVisionUpdate> visionConsumer = hasSwerve
@@ -209,6 +270,13 @@ public class RobotContainer {
             new VisionCamera(io1, VisionConstants.CAMERA_CONFIG_1),
             new VisionCamera(io2, VisionConstants.CAMERA_CONFIG_2),
             new VisionCamera(io3, VisionConstants.CAMERA_CONFIG_3));
+    }
+
+    /** Call from {@link Robot#simulationPeriodic()}. */
+    public void simulationPeriodic() {
+        if (swerveDriveSim != null) {
+            Logger.recordOutput("Swerve/SimGroundTruthPose", swerveDriveSim.getPose());
+        }
     }
 
     /** Update controller-connection alerts. Call from {@link Robot#robotPeriodic()}. */
@@ -290,13 +358,13 @@ public class RobotContainer {
             // the right stick past the deadband cancels it so the driver can override.
             // Wrapped in Commands.defer so the target angle is recomputed at every press.
             if (aimHelper != null) {
-                driveController.getController().triangle().whileTrue(
+                driveController.getAimToHub().whileTrue(
                     Commands.defer(
                         () -> aimHelper.createAimCommand(() -> false),
                         java.util.Set.of(swerveSubsystem)));
             }
 
-            driveController.getController().L2().whileTrue(hood.holdDownHood());
+            driveController.getHoldHoodDown().whileTrue(hood.holdDownHood());
         }
         if (Constants.MECH_ENABLED) {
             // ==================== INTAKE ROLLER ====================
@@ -318,7 +386,7 @@ public class RobotContainer {
             hopper.setDefaultCommand(hopper.stopHopper());
 
             // Square (drive) = emergency force intake in (pivot up + stop rollers) - hold to override
-            driveController.square()
+            driveController.getForceIntakeIn()
                 .whileTrue(Commands.parallel(pivot.retractPivot(), roller.stopRoller()));
 
             // ==================== INTAKE PIVOT ====================
@@ -442,7 +510,7 @@ public class RobotContainer {
             // Swerve-dependent drive controller commands
             if (Constants.SWERVE_ENABLED && swerveSubsystem != null) {
                 // Options button = reset pose to starting position (in front of red hub)
-                driveController.options()
+                driveController.getResetPose()
                     .onTrue(Commands.runOnce(() -> swerveSubsystem.resetToStartingPosition(), swerveSubsystem));
             }
         }
@@ -454,8 +522,14 @@ public class RobotContainer {
      * 0
      */
     private void constructController() {
-        driveController = new PS5DriveController();
-        driveController.setDeadZone(0.035);
+        // Sim drives with an Xbox controller, the robot with a PS5
+        if (Constants.CURRENT_MODE == Mode.REAL) {
+            driveController = new PS5DriveController();
+            driveController.setDeadZone(ControllerConstants.PS5_STICK_DEADBAND);
+        } else {
+            driveController = new XboxDriveController();
+            driveController.setDeadZone(ControllerConstants.XBOX_STICK_DEADBAND);
+        }
         mechController = (Constants.CURRENT_MODE == Mode.REAL)
             ? new CommandPS5Controller(1)
             : new PS5ControllerEmulator(1);

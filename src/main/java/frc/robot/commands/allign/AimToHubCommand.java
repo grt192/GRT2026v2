@@ -6,18 +6,18 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Constants.AlignConstants;
 import frc.robot.subsystems.fms.FieldManagementSubsystem;
-import frc.robot.subsystems.swerve.SwerveSubsystem;
+import frc.robot.subsystems.swerve.DriveSubsystem;
 import java.lang.reflect.Field;
 import java.util.function.BooleanSupplier;
 
 public class AimToHubCommand extends Command {
-    private final SwerveSubsystem swerveSubsystem;
+    private final DriveSubsystem swerveSubsystem;
     private final FieldManagementSubsystem fmsSubsystem;
     // Shooter offset relative to robot center (x: forward/back, y: left/right in meters)
     private static final Translation2d SHOOTER_OFFSET = new Translation2d(-0.08, 0.073);
 
     // Link to dimensions https://firstfrc.blob.core.windows.net/frc2026/FieldAssets/2026-field-dimension-dwgs.pdf
-    public AimToHubCommand(SwerveSubsystem swerveSubsystem, FieldManagementSubsystem fms) {
+    public AimToHubCommand(DriveSubsystem swerveSubsystem, FieldManagementSubsystem fms) {
         this.swerveSubsystem = swerveSubsystem;
         this.fmsSubsystem = fms;
         addRequirements(swerveSubsystem, fms);

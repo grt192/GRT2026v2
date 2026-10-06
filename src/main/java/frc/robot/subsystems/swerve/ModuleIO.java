@@ -2,7 +2,6 @@ package frc.robot.subsystems.swerve;
 
 import org.littletonrobotics.junction.AutoLog;
 import edu.wpi.first.math.geometry.Rotation2d;
-import frc.robot.subsystems.swerve.DriveSubsystem.SwerveModule;
 import frc.robot.util.ComponentStatus.EncoderHealth;
 import frc.robot.util.ComponentStatus.MotorControlMode;
 import frc.robot.util.PIDConstants;
@@ -61,16 +60,14 @@ public interface ModuleIO {
         return PIDConstants.ZERO;
     }
 
-    public default SwerveModule getModule() {
-        return SwerveModule.FL;
-    }
-
-    public default void setDriveVelocity(double velocityRPS, double feedForwardVolts) {}
+    /** Closed-loop wheel velocity (wheel rot/s) with an added torque-current feedforward (amps). */
+    public default void setDriveVelocity(double velocityRPS, double feedforwardAmps) {}
 
     public default void setDriveVelocity(double velocityRPS) {}
 
     public default void setDriveVoltage(double volts) {}
 
+    /** Closed-loop module angle in rotations, 0 = wheel facing robot forward. */
     public default void setSteerPosition(double positionRot) {}
 
     public default void setSteerVoltage(double volts) {}
