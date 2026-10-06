@@ -26,6 +26,9 @@ public final class VisionConstants {
     public static final double XY_COEFF_SINGLE_TAG = 0.01;
     public static final double THETA_COEFF = 0.03;
 
+    // How long a tag stays in the logged TagPoses after it was last seen
+    public static final double TARGET_LOG_TIME_SECS = 0.1;
+
     // intake
     public static final CameraConfig CAMERA_CONFIG_100 = new CameraConfig(
         "7",
