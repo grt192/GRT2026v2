@@ -125,8 +125,6 @@ public class RobotContainer {
     private UsbCamera driverCam;
 
     private double desiredHoodSpeed = 0;
-    // private final OldVisionSubsystem visionSubsystem1 = new OldVisionSubsystem(
-    // VisionConstants.CAMERA_CONFIG_11);
 
     private final Alert driveControllerDisconnectedAlert = new Alert("Drive Controller Disconnected", AlertType.kWarning);
     private final Alert mechControllerDisconnectedAlert = new Alert("Mech Controller Disconnected", AlertType.kWarning);
@@ -193,7 +191,6 @@ public class RobotContainer {
             swerveSubsystem.setPoseResetListener(
                 (pose) -> vision.resetHeading(Timer.getTimestamp(), pose.getRotation()));
         }
-        visionStuff();
         constructController();
         configureBindings();
         configureAutoChooser();
@@ -521,16 +518,5 @@ public class RobotContainer {
     // return new ShootAndLeaveAuton(swerveSubsystem, flywheel, hoodSubsystem, hopper, tower, pivotIntake);
     // }
 
-    // vision shit
-    public void visionStuff() {
-        // CommandScheduler.getInstance().schedule(
-        // new GetCameraDisplacement(visionSubsystem1,
-        // new Transform3d(
-        // Units.inchesToMeters(0),
-        // Units.inchesToMeters(-43 - 15),
-        // Units.inchesToMeters(44.25),
-        // new Rotation3d(0, 0, Math.PI / 2))));
-
-    }
 
 }
