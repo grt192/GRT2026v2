@@ -58,7 +58,7 @@ public final class Constants {
 
     public static class ControllerConstants {
         // Stick deadbands (fraction of full stick travel)
-        public static final double PS5_STICK_DEADBAND = 0.035;
+        public static final double PS5_STICK_DEADBAND = 0.1;
     }
 
     // ==================== DRIVETRAIN ====================

@@ -1,5 +1,6 @@
 package frc.robot.controllers;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
@@ -13,32 +14,17 @@ public class PS5DriveController extends BaseDriveController {
 
     @Override
     public double getForwardPower() {
-        double forwardPower = -driveController.getLeftY();
-        if (Math.abs(forwardPower) > deadZone) {
-            return -driveController.getLeftY();
-        } else {
-            return 0;
-        }
+        return MathUtil.applyDeadband(-driveController.getLeftY(), deadZone);
     }
 
     @Override
     public double getLeftPower() {
-        double leftPower = -driveController.getLeftX();
-        if (Math.abs(leftPower) > deadZone) {
-            return -driveController.getLeftX();
-        } else {
-            return 0;
-        }
+        return MathUtil.applyDeadband(-driveController.getLeftX(), deadZone);
     }
 
     @Override
     public double getRotatePower() {
-        double rotatePower = -driveController.getRightX();
-        if (Math.abs(rotatePower) > deadZone) {
-            return -driveController.getRightX();
-        } else {
-            return 0;
-        }
+        return MathUtil.applyDeadband(-driveController.getRightX(), deadZone);
     }
 
     @Override
