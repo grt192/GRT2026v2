@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.Optional;
 import org.littletonrobotics.junction.Logger;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -18,6 +19,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystems.swerve.DriveSubsystem;
 import frc.robot.subsystems.vision.TagSighting;
 import frc.robot.subsystems.vision.VisionSubsystem;
+import frc.robot.util.LoggedTunableNumber;
 
 /**
  * Drives so the camera that sees an AprilTag ends up square in front of it, backing off further the
@@ -30,6 +32,34 @@ import frc.robot.subsystems.vision.VisionSubsystem;
  */
 public class AlignToTagCommand extends Command {
     private static final String LOG_KEY = "AlignToTag";
+    private static final String TUNING_KEY = "AlignToTag/";
+
+    private final LoggedTunableNumber lowTagHeight =
+        new LoggedTunableNumber(TUNING_KEY + "LowTagHeight_m", LOW_TAG_HEIGHT_M);
+    private final LoggedTunableNumber lowTagDistance =
+        new LoggedTunableNumber(TUNING_KEY + "LowTagDistance_m", LOW_TAG_DISTANCE_M);
+    private final LoggedTunableNumber highTagHeight =
+        new LoggedTunableNumber(TUNING_KEY + "HighTagHeight_m", HIGH_TAG_HEIGHT_M);
+    private final LoggedTunableNumber highTagDistance =
+        new LoggedTunableNumber(TUNING_KEY + "HighTagDistance_m", HIGH_TAG_DISTANCE_M);
+
+    private final LoggedTunableNumber translationKP =
+        new LoggedTunableNumber(TUNING_KEY + "Translation/kP", TRANSLATION_KP);
+    private final LoggedTunableNumber translationKI =
+        new LoggedTunableNumber(TUNING_KEY + "Translation/kI", TRANSLATION_KI);
+    private final LoggedTunableNumber translationKD =
+        new LoggedTunableNumber(TUNING_KEY + "Translation/kD", TRANSLATION_KD);
+    private final LoggedTunableNumber rotationKP =
+        new LoggedTunableNumber(TUNING_KEY + "Rotation/kP", ROTATION_KP);
+    private final LoggedTunableNumber rotationKI =
+        new LoggedTunableNumber(TUNING_KEY + "Rotation/kI", ROTATION_KI);
+    private final LoggedTunableNumber rotationKD =
+        new LoggedTunableNumber(TUNING_KEY + "Rotation/kD", ROTATION_KD);
+
+    private final LoggedTunableNumber maxVelocity =
+        new LoggedTunableNumber(TUNING_KEY + "MaxVelocity_mps", MAX_VELOCITY_MPS);
+    private final LoggedTunableNumber maxOmega =
+        new LoggedTunableNumber(TUNING_KEY + "MaxOmega_radps", MAX_OMEGA_RADPS);
 
     private final DriveSubsystem drive;
     private final VisionSubsystem vision;
@@ -38,9 +68,19 @@ public class AlignToTagCommand extends Command {
     private double lastSeenTime = Double.NEGATIVE_INFINITY;
     private Pose2d goal = null;
 
+    // x and y share the translation gains; both work in the odometry frame
+    private final PIDController xController = new PIDController(TRANSLATION_KP, TRANSLATION_KI, TRANSLATION_KD);
+    private final PIDController yController = new PIDController(TRANSLATION_KP, TRANSLATION_KI, TRANSLATION_KD);
+    private final PIDController thetaController = new PIDController(ROTATION_KP, ROTATION_KI, ROTATION_KD);
+    private final LoggedTunableNumber.Watcher translationGains =
+        LoggedTunableNumber.watch(translationKP, translationKI, translationKD);
+    private final LoggedTunableNumber.Watcher rotationGains =
+        LoggedTunableNumber.watch(rotationKP, rotationKI, rotationKD);
+
     public AlignToTagCommand(DriveSubsystem drive, VisionSubsystem vision) {
         this.drive = drive;
         this.vision = vision;
+        thetaController.enableContinuousInput(-Math.PI, Math.PI);
         addRequirements(drive);
     }
 
@@ -48,10 +88,24 @@ public class AlignToTagCommand extends Command {
     public void initialize() {
         lockedTag = null;
         goal = null;
+
+        // Pick up gains tuned since the last run, and drop the old run's integral and derivative state
+        xController.setPID(translationKP.get(), translationKI.get(), translationKD.get());
+        yController.setPID(translationKP.get(), translationKI.get(), translationKD.get());
+        thetaController.setPID(rotationKP.get(), rotationKI.get(), rotationKD.get());
+        xController.reset();
+        yController.reset();
+        thetaController.reset();
     }
 
     @Override
     public void execute() {
+        translationGains.ifChanged(() -> {
+            xController.setPID(translationKP.get(), translationKI.get(), translationKD.get());
+            yController.setPID(translationKP.get(), translationKI.get(), translationKD.get());
+        });
+        rotationGains.ifChanged(() -> thetaController.setPID(rotationKP.get(), rotationKI.get(), rotationKD.get()));
+
         if (lockedTag != null && Timer.getTimestamp() - lastSeenTime > TAG_LOST_TIMEOUT_SECONDS) {
             lockedTag = null;
             goal = null;
@@ -87,9 +141,9 @@ public class AlignToTagCommand extends Command {
         // The robot frame sits on the floor, so the tag's z is its height
         double tagHeight = sighting.robotToTag().getZ();
         double distance = MathUtil.interpolate(
-            LOW_TAG_DISTANCE_M,
-            HIGH_TAG_DISTANCE_M,
-            MathUtil.inverseInterpolate(LOW_TAG_HEIGHT_M, HIGH_TAG_HEIGHT_M, tagHeight));
+            lowTagDistance.get(),
+            highTagDistance.get(),
+            MathUtil.inverseInterpolate(lowTagHeight.get(), highTagHeight.get(), tagHeight));
 
         // All in the robot's frame at the moment of the frame. A tag's +X points out of its face, so
         // the camera goal is that far out along it, turned around to look back at the tag
@@ -108,17 +162,24 @@ public class AlignToTagCommand extends Command {
     private void driveToGoal() {
         Pose2d pose = drive.getRobotPosition();
 
-        Translation2d velocity = goal.getTranslation().minus(pose.getTranslation()).times(TRANSLATION_P);
-        if (velocity.getNorm() > MAX_VELOCITY_MPS) {
-            velocity = velocity.times(MAX_VELOCITY_MPS / velocity.getNorm());
+        Translation2d velocity = new Translation2d(
+            xController.calculate(pose.getX(), goal.getX()),
+            yController.calculate(pose.getY(), goal.getY()));
+        // Cap the combined speed, not each axis, so diagonal moves aren't faster
+        double maxSpeed = maxVelocity.get();
+        if (velocity.getNorm() > maxSpeed) {
+            velocity = velocity.times(maxSpeed / velocity.getNorm());
         }
         double omega = MathUtil.clamp(
-            goal.getRotation().minus(pose.getRotation()).getRadians() * ROTATION_P,
-            -MAX_OMEGA_RADPS,
-            MAX_OMEGA_RADPS);
+            thetaController.calculate(pose.getRotation().getRadians(), goal.getRotation().getRadians()),
+            -maxOmega.get(),
+            maxOmega.get());
 
         drive.setRobotRelativeDrivePowers(
             ChassisSpeeds.fromFieldRelativeSpeeds(velocity.getX(), velocity.getY(), omega, pose.getRotation()));
+
+        Logger.recordOutput(LOG_KEY + "/TranslationErrorM", goal.getTranslation().getDistance(pose.getTranslation()));
+        Logger.recordOutput(LOG_KEY + "/RotationErrorDeg", goal.getRotation().minus(pose.getRotation()).getDegrees());
     }
 
     /**
