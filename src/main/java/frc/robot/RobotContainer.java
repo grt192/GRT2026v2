@@ -12,12 +12,10 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import frc.robot.Constants.CANType;
 import frc.robot.Constants.ControllerConstants;
-import frc.robot.Constants.Mode;
 import frc.robot.Constants.SwerveConstants;
 import frc.robot.commands.AlignToTagCommand;
 import frc.robot.controllers.BaseDriveController;
 import frc.robot.controllers.PS5DriveController;
-import frc.robot.controllers.XboxDriveController;
 import frc.robot.subsystems.swerve.DriveSubsystem;
 import frc.robot.subsystems.swerve.DriveSubsystem.SwerveModule;
 import frc.robot.subsystems.swerve.GyroIO;
@@ -64,22 +62,16 @@ public class RobotContainer {
 
         switch (Constants.CURRENT_MODE) {
             case REAL:
-                vision = createVision(
-                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_1),
-                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_2),
-                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_3));
+                vision = createVision(new VisionIOPhoton(VisionConstants.CAMERA_CONFIG));
                 break;
             case SIM:
-                // Cameras see the physics sim's true pose
+                // The camera sees the physics sim's true pose
                 Supplier<Pose3d> truePose = swerveDriveSim::getPose3d;
-                vision = createVision(
-                    new VisionIOPhotonSim(VisionConstants.CAMERA_CONFIG_1, truePose),
-                    new VisionIOPhotonSim(VisionConstants.CAMERA_CONFIG_2, truePose),
-                    new VisionIOPhotonSim(VisionConstants.CAMERA_CONFIG_3, truePose));
+                vision = createVision(new VisionIOPhotonSim(VisionConstants.CAMERA_CONFIG, truePose));
                 break;
             case REPLAY:
             default:
-                vision = createVision(new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
+                vision = createVision(new VisionIO() {});
                 break;
         }
 
@@ -136,12 +128,10 @@ public class RobotContainer {
         }
     }
 
-    private VisionSubsystem createVision(VisionIO io1, VisionIO io2, VisionIO io3) {
+    private VisionSubsystem createVision(VisionIO io) {
         return new VisionSubsystem(
             swerveSubsystem::getRobotPose3d,
-            new VisionCamera(io1, VisionConstants.CAMERA_CONFIG_1),
-            new VisionCamera(io2, VisionConstants.CAMERA_CONFIG_2),
-            new VisionCamera(io3, VisionConstants.CAMERA_CONFIG_3));
+            new VisionCamera(io, VisionConstants.CAMERA_CONFIG));
     }
 
     /** Call from {@link Robot#simulationPeriodic()}. */
@@ -165,21 +155,16 @@ public class RobotContainer {
                 driveController.getRotatePower()),
                 swerveSubsystem));
 
-        // Cross / A = reset the field axes to the current robot axes
+        // Cross = reset the field axes to the current robot axes
         driveController.bindDriverHeadingReset(swerveSubsystem::resetDriverHeading, swerveSubsystem);
 
-        // Triangle / Y (hold) = align to the AprilTag in view
+        // Triangle (hold) = align to the AprilTag in view
         driveController.getAlignToTag().whileTrue(new AlignToTagCommand(swerveSubsystem, vision));
     }
 
-    /** Sim drives with an Xbox controller, the robot with a PS5 */
+    /** A DualSense on port 0, on the robot and in sim */
     private void constructController() {
-        if (Constants.CURRENT_MODE == Mode.REAL) {
-            driveController = new PS5DriveController();
-            driveController.setDeadZone(ControllerConstants.PS5_STICK_DEADBAND);
-        } else {
-            driveController = new XboxDriveController();
-            driveController.setDeadZone(ControllerConstants.XBOX_STICK_DEADBAND);
-        }
+        driveController = new PS5DriveController();
+        driveController.setDeadZone(ControllerConstants.PS5_STICK_DEADBAND);
     }
 }

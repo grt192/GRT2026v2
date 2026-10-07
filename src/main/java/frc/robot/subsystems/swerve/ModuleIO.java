@@ -60,8 +60,8 @@ public interface ModuleIO {
         return PIDConstants.ZERO;
     }
 
-    /** Closed-loop wheel velocity (wheel rot/s) with an added torque-current feedforward (amps). */
-    public default void setDriveVelocity(double velocityRPS, double feedforwardAmps) {}
+    /** Closed-loop wheel velocity (wheel rot/s) with an added feedforward (volts). */
+    public default void setDriveVelocity(double velocityRPS, double feedforwardVolts) {}
 
     public default void setDriveVelocity(double velocityRPS) {}
 

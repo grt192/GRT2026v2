@@ -5,7 +5,6 @@ import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.util.Units;
-import frc.robot.util.ZyzToXyzEulerConverter;
 
 public final class VisionConstants {
     // Only the sim uses this, to know where tags are. The robot aligns to whatever tag it sees
@@ -24,30 +23,14 @@ public final class VisionConstants {
     public static final double SIM_AVG_LATENCY_MS = 35.0;
     public static final double SIM_LATENCY_STD_DEV_MS = 5.0;
 
-    // the big 3 cameras
-    public static final CameraConfig CAMERA_CONFIG_1 = new CameraConfig(// climb camera
-        "1",
+    // On the front edge of the frame, centered, facing forward and tilted up 30 degrees (negative
+    // pitch is up). Name and height are placeholders: match the name to PhotonVision and measure
+    // the height from the floor to the lens
+    public static final CameraConfig CAMERA_CONFIG = new CameraConfig(
+        "front",
         new Transform3d(
-            Units.inchesToMeters(27.5 / 2 - 16.75),
-            Units.inchesToMeters(27.5 / 2 - 2.75),
-            Units.inchesToMeters(11.5),
-            new Rotation3d(Math.PI, -Math.toRadians(30), -Math.PI / 2.0)));
-
-    // intake
-    public static final CameraConfig CAMERA_CONFIG_2 = new CameraConfig(// shooter camera
-        "2",
-        new Transform3d(
-            Units.inchesToMeters(-(27.5 / 2 - 1.5)),
-            Units.inchesToMeters(-(27.5 / 2 - 6.5)),
-            Units.inchesToMeters(18.75),
-            ZyzToXyzEulerConverter.zyxToXyz(-Math.PI / 2, -Math.toRadians(21), 0)));
-
-    // hopper
-    public static final CameraConfig CAMERA_CONFIG_3 = new CameraConfig(// auxillary camera
-        "3",
-        new Transform3d(
-            Units.inchesToMeters(-(27.5 / 2 - 2.5)),
-            Units.inchesToMeters(-(27.5 / 2 - 10.5)),
-            Units.inchesToMeters(15),
-            ZyzToXyzEulerConverter.zyxToXyz(Math.PI, -Math.toRadians(11), 0)));
+            Units.inchesToMeters(27.5 / 2),
+            0.0,
+            Units.inchesToMeters(8),
+            new Rotation3d(0.0, -Math.toRadians(30), 0.0)));
 }

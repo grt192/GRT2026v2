@@ -35,7 +35,7 @@ public class SingleModule {
 
     private SimpleMotorFeedforward driveFeedforwardModel;
 
-    private double commandedDriveFeedforwardAmps = 0.0;
+    private double commandedDriveFeedforwardVolts = 0.0;
     private double commandedDriveVelocityRPS = 0.0;
 
     private double commandedSteerPositionRot = 0.0;
@@ -92,7 +92,7 @@ public class SingleModule {
         }
 
         Logger.recordOutput(logKey + "/CommandedDriveVelocity_rps", commandedDriveVelocityRPS);
-        Logger.recordOutput(logKey + "/CommandedDriveFeedforward_amps", commandedDriveFeedforwardAmps);
+        Logger.recordOutput(logKey + "/CommandedDriveFeedforward_volts", commandedDriveFeedforwardVolts);
         Logger.recordOutput(logKey + "/CommandedSteerPosition_rot", commandedSteerPositionRot);
 
         LoggedTracer.record(logKey);
@@ -110,15 +110,15 @@ public class SingleModule {
 
         commandedSteerPositionRot = state.angle.getRotations();
         commandedDriveVelocityRPS = idealDriveVelocityRPS;
-        commandedDriveFeedforwardAmps = driveFeedforwardModel.calculate(idealDriveVelocityRPS);
+        commandedDriveFeedforwardVolts = driveFeedforwardModel.calculate(idealDriveVelocityRPS);
 
-        io.setDriveVelocity(commandedDriveVelocityRPS, commandedDriveFeedforwardAmps);
+        io.setDriveVelocity(commandedDriveVelocityRPS, commandedDriveFeedforwardVolts);
         io.setSteerPosition(commandedSteerPositionRot);
     }
 
     public void stop() {
         commandedDriveVelocityRPS = 0.0;
-        commandedDriveFeedforwardAmps = 0.0;
+        commandedDriveFeedforwardVolts = 0.0;
         io.stopDrive();
         io.stopSteer();
     }
