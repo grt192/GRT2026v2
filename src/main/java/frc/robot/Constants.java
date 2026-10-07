@@ -9,6 +9,7 @@ import com.ctre.phoenix6.CANBus;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.RobotBase;
 
 /**
@@ -193,12 +194,15 @@ public final class Constants {
     // ==================== ALIGN TO TAG ====================
 
     public static class AlignToTagConstants {
-        // How far the camera stops from the tag (horizontal meters) for a given tag height above the
-        // floor (meters). Heights in between are interpolated, heights outside are clamped
-        public static final double LOW_TAG_HEIGHT_M = 0.3;
-        public static final double LOW_TAG_DISTANCE_M = 1.0;
-        public static final double HIGH_TAG_HEIGHT_M = 1.5;
-        public static final double HIGH_TAG_DISTANCE_M = 2.5;
+        // How far the camera stops from the tag (horizontal, camera lens to tag face) for a given tag
+        // height (floor to tag center). Heights in between are interpolated, heights outside are
+        // clamped. With the camera 8 in up and tilted 28.6 degrees, both ends keep the whole tag in
+        // frame: about 11-20 degrees above level for the low tag and 32-33 for the high one, inside
+        // the camera's roughly 5-53 degree view
+        public static final double LOW_TAG_HEIGHT_M = Units.feetToMeters(1.5);
+        public static final double LOW_TAG_DISTANCE_M = Units.feetToMeters(3);
+        public static final double HIGH_TAG_HEIGHT_M = Units.feetToMeters(7);
+        public static final double HIGH_TAG_DISTANCE_M = Units.feetToMeters(10);
 
         // Translation (m/s per m of error) and rotation (rad/s per rad of error) gains
         public static final double TRANSLATION_P = 2.0;
