@@ -2,13 +2,20 @@ package frc.robot.subsystems.vision;
 
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.util.Units;
 
 public final class VisionConstants {
-    // Only the sim uses this, to know where tags are. The robot aligns to whatever tag it sees
-    public static final AprilTagFieldLayout FIELD_LAYOUT = AprilTagFieldLayout.loadField(AprilTagFields.k2026RebuiltWelded);
+    // The sim has a single tag at the center of the field, facing the red side (+X, where the robot
+    // spawns). Its height (floor to tag center) is tunable. The robot aligns to whatever tag it sees
+    public static final AprilTagFieldLayout SIM_FIELD = AprilTagFieldLayout.loadField(AprilTagFields.k2026RebuiltWelded);
+    public static final int SIM_TAG_ID = 1;
+    public static final Pose2d SIM_TAG_POSE =
+        new Pose2d(SIM_FIELD.getFieldLength() / 2, SIM_FIELD.getFieldWidth() / 2, Rotation2d.kZero);
+    public static final double SIM_TAG_DEFAULT_HEIGHT_M = Units.inchesToMeters(44.25);
 
     // Pose ambiguity above this is ignored (0 = certain, 1 = coin flip between two solutions)
     public static final double MAX_AMBIGUITY = 0.2;
@@ -23,14 +30,15 @@ public final class VisionConstants {
     public static final double SIM_AVG_LATENCY_MS = 35.0;
     public static final double SIM_LATENCY_STD_DEV_MS = 5.0;
 
-    // On the front edge of the frame, centered, facing forward and tilted up 30 degrees (negative
-    // pitch is up). Name and height are placeholders: match the name to PhotonVision and measure
-    // the height from the floor to the lens
+    // On the front of the frame, centered side to side, 8 in off the floor. CAD gives the tilt as
+    // 61.386926 degrees with 90 = level, so it's 90 - 61.386926 = 28.613074 degrees up (negative
+    // pitch is up). The name is a placeholder: match it to PhotonVision
+    public static final double CAMERA_TILT_UP_DEG = 90.0 - 61.386926;
     public static final CameraConfig CAMERA_CONFIG = new CameraConfig(
         "front",
         new Transform3d(
-            Units.inchesToMeters(27.5 / 2),
+            Units.inchesToMeters(27.5 / 2), // forward from robot center: placeholder, measure it
             0.0,
             Units.inchesToMeters(8),
-            new Rotation3d(0.0, -Math.toRadians(30), 0.0)));
+            new Rotation3d(0.0, -Math.toRadians(CAMERA_TILT_UP_DEG), 0.0)));
 }
