@@ -12,9 +12,8 @@ import com.ctre.phoenix6.configs.FeedbackConfigs;
 import com.ctre.phoenix6.configs.MotorOutputConfigs;
 import com.ctre.phoenix6.configs.Slot0Configs;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.configs.TorqueCurrentConfigs;
-import com.ctre.phoenix6.controls.PositionTorqueCurrentFOC;
-import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
+import com.ctre.phoenix6.controls.PositionVoltage;
+import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.ParentDevice;
@@ -69,9 +68,10 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     protected final CANcoder steerEncoder;
 
-    private final PositionTorqueCurrentFOC positionControl = new PositionTorqueCurrentFOC(0.0);
-    private final VelocityTorqueCurrentFOC velocityControl = new VelocityTorqueCurrentFOC(0.0);
-    private final VoltageOut voltageControl = new VoltageOut(0.0).withEnableFOC(true);
+    // Non-Pro control modes (no torque-current or FOC), so unlicensed devices run them
+    private final PositionVoltage positionControl = new PositionVoltage(0.0);
+    private final VelocityVoltage velocityControl = new VelocityVoltage(0.0);
+    private final VoltageOut voltageControl = new VoltageOut(0.0);
 
     private final List<BaseStatusSignal> driveSignals;
     private StatusSignal<Angle> drivePosition;
@@ -214,9 +214,6 @@ public class ModuleIOTalonFX implements ModuleIO {
         steerEncoder = new CANcoder(cancoderID, canivore);
 
         TalonFXConfiguration driveConfig = new TalonFXConfiguration();
-        driveConfig.withTorqueCurrent(new TorqueCurrentConfigs()
-            .withPeakForwardTorqueCurrent(SwerveDriveConstants.DRIVE_PEAK_STATOR_CURRENT)
-            .withPeakReverseTorqueCurrent(-SwerveDriveConstants.DRIVE_PEAK_STATOR_CURRENT));
         driveConfig.withCurrentLimits(new CurrentLimitsConfigs()
             .withSupplyCurrentLimit(SwerveDriveConstants.DRIVE_SUPPLY_CURRENT_LIMIT)
             .withSupplyCurrentLimitEnable(SwerveDriveConstants.DRIVE_CURRENT_LIMIT_ENABLE)
@@ -234,9 +231,6 @@ public class ModuleIOTalonFX implements ModuleIO {
         tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig), failedToConfigureDrive);
 
         TalonFXConfiguration steerConfig = new TalonFXConfiguration();
-        steerConfig.withTorqueCurrent(new TorqueCurrentConfigs()
-            .withPeakForwardTorqueCurrent(SwerveSteerConstants.STEER_PEAK_STATOR_CURRENT)
-            .withPeakReverseTorqueCurrent(-SwerveSteerConstants.STEER_PEAK_STATOR_CURRENT));
         steerConfig.withCurrentLimits(new CurrentLimitsConfigs()
             .withSupplyCurrentLimit(SwerveSteerConstants.STEER_SUPPLY_CURRENT_LIMIT)
             .withSupplyCurrentLimitEnable(SwerveSteerConstants.STEER_CURRENT_LIMIT_ENABLE)
@@ -246,7 +240,8 @@ public class ModuleIOTalonFX implements ModuleIO {
             .withInverted(InvertedValue.Clockwise_Positive)
             .withNeutralMode(NeutralModeValue.Brake));
         steerConfig.withFeedback(new FeedbackConfigs()
-            .withFeedbackSensorSource(FeedbackSensorSourceValue.FusedCANcoder)
+            // FusedCANcoder is Pro-only
+            .withFeedbackSensorSource(FeedbackSensorSourceValue.RemoteCANcoder)
             .withFeedbackRemoteSensorID(cancoderID)
             .withRotorToSensorRatio(SwerveSteerConstants.STEER_GEAR_REDUCTION));
         steerConfig.withClosedLoopGeneral(new ClosedLoopGeneralConfigs()
@@ -430,8 +425,8 @@ public class ModuleIOTalonFX implements ModuleIO {
     }
 
     @Override
-    public void setDriveVelocity(double velocityRPS, double feedforwardAmps) {
-        driveMotor.setControl(velocityControl.withVelocity(velocityRPS).withFeedForward(feedforwardAmps));
+    public void setDriveVelocity(double velocityRPS, double feedforwardVolts) {
+        driveMotor.setControl(velocityControl.withVelocity(velocityRPS).withFeedForward(feedforwardVolts));
     }
 
     @Override

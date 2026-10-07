@@ -69,33 +69,29 @@ public final class Constants {
         // Current Limits
         public static final double DRIVE_SUPPLY_CURRENT_LIMIT = 70;
 
-        public static final double DRIVE_STATOR_CURRENT_LIMIT = 200; // hardware safety cutoff
-        public static final double DRIVE_PEAK_STATOR_CURRENT = 120; // max current FOC control can request
+        public static final double DRIVE_STATOR_CURRENT_LIMIT = 120;
 
         public static final boolean DRIVE_CURRENT_LIMIT_ENABLE = true;
 
         // Physical Measurements (
         public static final double DRIVE_WHEEL_RADIUS_METERS = 0.051; // meters
         public static final double DRIVE_WHEEL_CIRCUMFERENCE_METERS = 2.0 * Math.PI * DRIVE_WHEEL_RADIUS_METERS; // meters
-        public static final double DRIVE_GEAR_REDUCTION = 8.25; // L2 gearing
+        public static final double DRIVE_GEAR_REDUCTION = 8.25; // R1 gearing
 
         // Measured max drive speed
         public static final double TRUE_MAX_DRIVE_SPEED = 3.87; // put robot in the air and measure from nt
 
-        // Velocity PID (VelocityTorqueCurrentFOC: amps per wheel rot/s). These were tuned against
-        // motor-rotor rot/s, so they're scaled by the gear reduction now that the TalonFX reports
-        // wheel rotations.
-        public static final double kP = 9.5 * DRIVE_GEAR_REDUCTION;
+        // Velocity PID (VelocityVoltage: volts per wheel rot/s). Starting points, not tuned on BetaBot:
+        // CTRE's swerve defaults per motor-rotor rot/s, scaled by the gear reduction since the TalonFX
+        // reports wheel rotations. kV is 12 V over a Kraken X60's ~100 rot/s free speed
+        public static final double kP = 0.1 * DRIVE_GEAR_REDUCTION;
         public static final double kI = 0.0;
-        public static final double kD = 0.1 * DRIVE_GEAR_REDUCTION;
-        public static final double kS = 0.5; // amps
+        public static final double kD = 0.0;
+        public static final double kS = 0.15; // volts
         public static final double kV = 0.12 * DRIVE_GEAR_REDUCTION;
     }
 
     public static class SwerveSteerConstants {
-        // Motor Configuration
-        public static final double STEER_PEAK_STATOR_CURRENT = 40;
-
         // Current Limits (optimized for Kraken motors - steer needs less current)
         public static final double STEER_SUPPLY_CURRENT_LIMIT = 30; // Prevents brownouts
         public static final double STEER_STATOR_CURRENT_LIMIT = 50; // Sufficient for steering
@@ -104,13 +100,13 @@ public final class Constants {
         // Physical Measurements
         public static final double STEER_GEAR_REDUCTION = 160.0 / 7.0; // ~22.86:1
 
-        // Position PID (PositionTorqueCurrentFOC: amps per module rotation)
-        public static final double kP = 190;
+        // Position PID (PositionVoltage: volts per module rotation). CTRE's swerve defaults, not tuned
+        // on BetaBot
+        public static final double kP = 100;
         public static final double kI = 0;
-        public static final double kD = 7;
-        public static final double kS = 1;
+        public static final double kD = 0.5;
+        public static final double kS = 0.1;
         public static final double kV = 0;
-
     }
 
     /** Physical model for the maple-sim drivetrain. Estimates -- update with real numbers when known. */
