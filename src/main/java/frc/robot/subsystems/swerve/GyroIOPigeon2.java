@@ -51,7 +51,18 @@ public class GyroIOPigeon2 implements GyroIO {
 
     public GyroIOPigeon2(LoggedCanivore canivore) {
         pigeon = new Pigeon2(SwerveConstants.PIGEON_ID, canivore);
-        PhoenixUtil.tryUntilOk(5, () -> pigeon.getConfigurator().apply(new Pigeon2Configuration()), failedToConfigureAlert);
+        Pigeon2Configuration config = new Pigeon2Configuration();
+        // From Phoenix Tuner X's mount pose calibration: the Pigeon is upside down and facing backward.
+        // Set here because applying a config replaces whatever Tuner saved on the device. Without it the 3D
+        // pose estimator treats the robot as flipped, which mirrors every strafe (robot +Y) in the pose
+        config.MountPose.MountPoseYaw = -178.94;
+        config.MountPose.MountPosePitch = 0.02;
+        config.MountPose.MountPoseRoll = 179.97;
+        // 10 hand-pushed turns read 3566° (3.4° short per turn), which showed up as the field-relative
+        // heading slowly shifting during matches with lots of spinning. CTRE doesn't document the sign:
+        // +3.4 doubled the error, so a reading that's short per turn needs a negative value here
+        config.GyroTrim.GyroScalarZ = -3.4;
+        PhoenixUtil.tryUntilOk(5, () -> pigeon.getConfigurator().apply(config), failedToConfigureAlert);
         pigeon.getConfigurator().setYaw(0.0);
 
         yaw = pigeon.getYaw();

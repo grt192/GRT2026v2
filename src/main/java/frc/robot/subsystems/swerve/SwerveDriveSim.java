@@ -45,7 +45,7 @@ public class SwerveDriveSim {
         SimulatedArena.overrideInstance(arena);
 
         DriveTrainSimulationConfig config = DriveTrainSimulationConfig.Default()
-            .withRobotMass(Kilograms.of(SwerveSimConstants.ROBOT_MASS_KG))
+            .withRobotMass(Kilograms.of(SwerveConstants.ROBOT_MASS_KG))
             .withBumperSize(
                 Meters.of(SwerveSimConstants.BUMPER_LENGTH_X_METERS),
                 Meters.of(SwerveSimConstants.BUMPER_WIDTH_Y_METERS))
@@ -62,7 +62,7 @@ public class SwerveDriveSim {
                 Volts.of(SwerveSimConstants.STEER_FRICTION_VOLTS),
                 Meters.of(SwerveDriveConstants.DRIVE_WHEEL_RADIUS_METERS),
                 KilogramSquareMeters.of(SwerveSimConstants.STEER_MOMENT_OF_INERTIA_KG_M2),
-                SwerveSimConstants.WHEEL_COEFFICIENT_OF_FRICTION));
+                SwerveConstants.WHEEL_COEFFICIENT_OF_FRICTION));
 
         driveSimulation = new SwerveDriveSimulation(config, startingPose);
         arena.addDriveTrainSimulation(driveSimulation);
