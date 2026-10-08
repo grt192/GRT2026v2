@@ -2,12 +2,21 @@ package frc.robot.subsystems.swerve;
 
 import static frc.robot.Constants.SwerveConstants.*;
 
+import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import org.littletonrobotics.junction.AutoLogOutput;
+import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
+import com.pathplanner.lib.config.ModuleConfig;
+import com.pathplanner.lib.config.RobotConfig;
+import com.pathplanner.lib.util.DriveFeedforwards;
+import com.pathplanner.lib.util.swerve.SwerveSetpoint;
+import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
@@ -18,10 +27,14 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.Constants.Mode;
+import frc.robot.Constants.SwerveDriveConstants;
+import frc.robot.Constants.SwerveSteerConstants;
 import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
 
@@ -72,38 +85,38 @@ public class DriveSubsystem extends SubsystemBase {
     };
     private Rotation2d driverHeadingOffset = Rotation2d.kZero;
 
-    // Setpoints, applied to the modules in periodic()
-    private SwerveModuleState[] desiredStates = {
-            new SwerveModuleState(),
-            new SwerveModuleState(),
-            new SwerveModuleState(),
-            new SwerveModuleState()
-    };
+    // Robot-relative speeds asked for by the driver or a command. periodic() runs them through the
+    // setpoint generator and sends the result to the modules
+    private ChassisSpeeds desiredSpeeds = new ChassisSpeeds();
+    // Steps desiredSpeeds toward what the modules can physically do in one loop (steering speed, motor
+    // torque, wheel grip). It also discretizes the speeds, so nothing upstream should
+    private final SwerveSetpointGenerator setpointGenerator;
+    private SwerveSetpoint previousSetpoint = new SwerveSetpoint(
+        new ChassisSpeeds(),
+        new SwerveModuleState[] {
+                new SwerveModuleState(),
+                new SwerveModuleState(),
+                new SwerveModuleState(),
+                new SwerveModuleState()
+        },
+        DriveFeedforwards.zeros(4));
     private final Timer lockTimer = new Timer();
 
-    // Acceleration limiting
-    private final LoggedTunableNumber maxLinearAcceleration =
-        new LoggedTunableNumber("Swerve/MaxLinearAccel_mps2", MAX_LINEAR_ACCELERATION);
-    private final LoggedTunableNumber maxLinearDeceleration =
-        new LoggedTunableNumber("Swerve/MaxLinearDecel_mps2", MAX_LINEAR_DECELERATION);
-    private final LoggedTunableNumber maxAngularAcceleration =
-        new LoggedTunableNumber("Swerve/MaxAngularAccel_radps2", MAX_ANGULAR_ACCELERATION);
-    private final LoggedTunableNumber maxAngularDeceleration =
-        new LoggedTunableNumber("Swerve/MaxAngularDecel_radps2", MAX_ANGULAR_DECELERATION);
-    private ChassisSpeeds previousSpeeds = new ChassisSpeeds();
-    private double lastUpdateTime = 0.0;
-
-    // Boost mode flag
-    @AutoLogOutput(key = "Swerve/BoostMode")
-    private boolean boostModeEnabled = false;
+    // Heading hold
+    private final LoggedTunableNumber headingHoldKP =
+        new LoggedTunableNumber("Swerve/HeadingHold/kP", HEADING_HOLD_KP);
+    private final LoggedTunableNumber headingHoldKD =
+        new LoggedTunableNumber("Swerve/HeadingHold/kD", HEADING_HOLD_KD);
+    private final LoggedTunableNumber.Watcher headingHoldGainsWatcher =
+        LoggedTunableNumber.watch(headingHoldKP, headingHoldKD);
+    private final PIDController headingHoldController = new PIDController(HEADING_HOLD_KP, 0.0, HEADING_HOLD_KD);
+    // Gyro yaw to hold, or empty while the driver is rotating or not translating
+    private Optional<Rotation2d> headingHoldTarget = Optional.empty();
 
     // Robot-relative mode flag (held button -- release returns to field-relative)
     @AutoLogOutput(key = "Swerve/RobotRelative")
     private boolean robotRelativeEnabled = false;
 
-    // Drive speed limit multiplier (controlled by left trigger)
-    @AutoLogOutput(key = "Swerve/DriveSpeedLimit")
-    private double driveSpeedLimit = 1.0;
 
     public DriveSubsystem(GyroIO gyroIO, ModuleIO flModuleIO, ModuleIO frModuleIO, ModuleIO blModuleIO, ModuleIO brModuleIO) {
         this.gyroIO = gyroIO;
@@ -120,6 +133,22 @@ public class DriveSubsystem extends SubsystemBase {
             VecBuilder.fill(ODOMETRY_XY_STD_DEV_M, ODOMETRY_XY_STD_DEV_M, ODOMETRY_Z_STD_DEV_M, ODOMETRY_THETA_STD_DEV_RAD),
             // Unused: there is no vision to feed the estimator
             VecBuilder.fill(0.9, 0.9, 0.9, 0.9));
+
+        RobotConfig robotConfig = new RobotConfig(
+            ROBOT_MASS_KG,
+            ROBOT_MOI_KG_M2,
+            new ModuleConfig(
+                SwerveDriveConstants.DRIVE_WHEEL_RADIUS_METERS,
+                MAX_VEL,
+                WHEEL_COEFFICIENT_OF_FRICTION,
+                DCMotor.getKrakenX60(1), // Not FOC: BetaBot has no Pro license
+                SwerveDriveConstants.DRIVE_GEAR_REDUCTION,
+                SwerveDriveConstants.DRIVE_STATOR_CURRENT_LIMIT,
+                1),
+            FL_POS, FR_POS, BL_POS, BR_POS);
+        setpointGenerator = new SwerveSetpointGenerator(robotConfig, SwerveSteerConstants.MAX_STEER_VELOCITY_RAD_PER_SEC);
+
+        headingHoldController.enableContinuousInput(-Math.PI, Math.PI);
 
         // Sim feeds odometry one sample per loop instead (see ModuleIOTalonFXSim)
         if (Constants.CURRENT_MODE == Mode.REAL) {
@@ -147,12 +176,20 @@ public class DriveSubsystem extends SubsystemBase {
 
         updateOdometry();
 
-        // If all commanded velocities are 0, the system is idle (drivers / commands are
-        // not supplying input).
-        boolean isIdle = true;
-        for (SwerveModuleState state : desiredStates) {
-            isIdle &= state.speedMetersPerSecond == 0.0;
+        headingHoldGainsWatcher.ifChanged(() -> headingHoldController.setPID(headingHoldKP.get(), 0.0, headingHoldKD.get()));
+
+        if (DriverStation.isDisabled()) {
+            // Commands don't run while disabled, so drop the last request instead of acting on it the
+            // moment the robot is enabled
+            desiredSpeeds = new ChassisSpeeds();
+            headingHoldTarget = Optional.empty();
         }
+
+        // Nothing is asking the drivetrain to move (compared against a small threshold rather than
+        // exactly 0, since filtered and computed speeds may never land on exactly 0)
+        boolean isIdle =
+            Math.hypot(desiredSpeeds.vxMetersPerSecond, desiredSpeeds.vyMetersPerSecond) < IDLE_LINEAR_VELOCITY_MPS
+                && Math.abs(desiredSpeeds.omegaRadiansPerSecond) < IDLE_ANGULAR_VELOCITY_RAD_PER_SEC;
 
         // Start lock timer when idle
         if (isIdle) {
@@ -162,18 +199,27 @@ public class DriveSubsystem extends SubsystemBase {
             lockTimer.reset();
         }
 
+        boolean locked = lockTimer.hasElapsed(LOCK_TIMEOUT_SECONDS);
+        if (DriverStation.isDisabled() || locked) {
+            // The modules aren't following the generator here, so restart it from where they really are
+            previousSetpoint = new SwerveSetpoint(getRobotRelativeChassisSpeeds(), getModuleStates(), DriveFeedforwards.zeros(4));
+        }
+
         // Lock the swerve module if the lock timeout has elapsed, or set them to their
         // setpoints if drivers are supplying non-idle input.
-        if (lockTimer.hasElapsed(LOCK_TIMEOUT_SECONDS)) {
+        if (locked) {
             applyLock();
         } else {
+            previousSetpoint = setpointGenerator.generateSetpoint(previousSetpoint, desiredSpeeds, LoggedRobot.defaultPeriodSecs);
             for (int i = 0; i < 4; i++) {
-                modules[i].setModuleState(desiredStates[i]);
+                modules[i].setModuleState(previousSetpoint.moduleStates()[i]);
             }
         }
 
-        Logger.recordOutput("Swerve/SwerveStates/Setpoints", desiredStates);
-        Logger.recordOutput("Swerve/Locked", lockTimer.hasElapsed(LOCK_TIMEOUT_SECONDS));
+        Logger.recordOutput("Swerve/ChassisSpeeds/Desired", desiredSpeeds);
+        Logger.recordOutput("Swerve/ChassisSpeeds/Setpoint", previousSetpoint.robotRelativeSpeeds());
+        Logger.recordOutput("Swerve/SwerveStates/Setpoints", previousSetpoint.moduleStates());
+        Logger.recordOutput("Swerve/Locked", locked);
         Logger.recordOutput("Swerve/DriverHeading", getDriverHeading());
 
         LoggedTracer.record("Swerve/Periodic");
@@ -246,57 +292,78 @@ public class DriveSubsystem extends SubsystemBase {
      * @param angularPower [-1, 1] The rotational power.
      */
     public void setDrivePowers(double xPower, double yPower, double angularPower) {
-        // Boost mode ignores the drive speed-limit multiplier (L2 / R1 slow) and
-        // bypasses the software acceleration limiter -- raw commands straight to
-        // the modules, capped only by the physical motor maxes.
-        double speedLimit = boostModeEnabled ? 1.0 : driveSpeedLimit;
-        double limitedMaxVel = MAX_VEL * speedLimit;
-        double limitedMaxOmega = MAX_OMEGA * speedLimit;
-
         // Robot-relative (held button): interpret stick forward as the robot's
         // own +X, which is the physical front (see FL_POS / FR_POS in Constants).
         // Field-relative (default): rotate stick axes into the robot frame using
         // the driver heading.
-        ChassisSpeeds desiredSpeeds;
+        ChassisSpeeds requestedSpeeds;
         if (robotRelativeEnabled) {
-            desiredSpeeds = new ChassisSpeeds(
-                xPower * limitedMaxVel,
-                yPower * limitedMaxVel,
-                angularPower * limitedMaxOmega);
+            requestedSpeeds = new ChassisSpeeds(
+                xPower * MAX_VEL,
+                yPower * MAX_VEL,
+                angularPower * MAX_OMEGA);
         } else {
-            desiredSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(
-                xPower * limitedMaxVel,
-                yPower * limitedMaxVel,
-                angularPower * limitedMaxOmega,
+            requestedSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(
+                xPower * MAX_VEL,
+                yPower * MAX_VEL,
+                angularPower * MAX_OMEGA,
                 getDriverHeading());
         }
 
-        ChassisSpeeds speeds;
-        if (boostModeEnabled) {
-            // Skip accel limiting entirely, but keep the limiter's state in sync
-            // so releasing boost doesn't cause a jerk from a stale previousSpeeds.
-            speeds = desiredSpeeds;
-            previousSpeeds = desiredSpeeds;
-            lastUpdateTime = Timer.getFPGATimestamp();
-        } else {
-            speeds = limitAcceleration(desiredSpeeds);
-        }
+        double omega = applyHeadingHold(
+            requestedSpeeds.omegaRadiansPerSecond, angularPower != 0.0, xPower != 0.0 || yPower != 0.0, MAX_OMEGA);
+        ChassisSpeeds speeds =
+            new ChassisSpeeds(requestedSpeeds.vxMetersPerSecond, requestedSpeeds.vyMetersPerSecond, omega);
 
+        // Scale down together if translating and rotating would ask a module for more than the limit
         SwerveModuleState[] states = kinematics.toSwerveModuleStates(speeds);
         SwerveDriveKinematics.desaturateWheelSpeeds(
             states, speeds,
-            limitedMaxVel, limitedMaxVel, limitedMaxOmega);
-        desiredStates = states;
+            MAX_VEL, MAX_VEL, MAX_OMEGA);
+        desiredSpeeds = kinematics.toChassisSpeeds(states);
     }
 
     /**
-     * Enables or disables boost mode.
-     * When enabled, uses higher max velocity and acceleration values.
+     * Holds the gyro heading while the driver translates with the rotation stick released, so carpet
+     * drag and uneven wheel grip don't slowly turn the robot.
      *
-     * @param enabled true to enable boost mode, false to disable
+     * @param omegaRadPerSec the rotation already being commanded
+     * @param rotateRequested whether the driver is using the rotation stick
+     * @param translateRequested whether the driver is using the translation stick
+     * @param maxOmegaRadPerSec the most rotation heading hold may add
+     * @return the rotation to command, with any heading correction added
      */
-    public void setBoostMode(boolean enabled) {
-        this.boostModeEnabled = enabled;
+    private double applyHeadingHold(
+        double omegaRadPerSec, boolean rotateRequested, boolean translateRequested, double maxOmegaRadPerSec) {
+        // Off while stopped too: drift only comes from translating, and holding while parked would just
+        // fight anyone pushing the robot (and keep it from ever going idle and X-locking)
+        if (rotateRequested || !translateRequested) {
+            headingHoldTarget = Optional.empty();
+            Logger.recordOutput("Swerve/HeadingHold/Active", false);
+            return omegaRadPerSec;
+        }
+
+        Rotation2d heading = rawGyroRotation.toRotation2d();
+        if (headingHoldTarget.isEmpty()) {
+            // Wait for the robot to stop coasting from the last turn, or it would snap back to where the
+            // stick was released
+            if (Math.abs(getRobotRelativeChassisSpeeds().omegaRadiansPerSecond) > HEADING_HOLD_SETTLED_VELOCITY_RAD_PER_SEC) {
+                Logger.recordOutput("Swerve/HeadingHold/Active", false);
+                return omegaRadPerSec;
+            }
+            headingHoldTarget = Optional.of(heading);
+            headingHoldController.reset();
+        }
+
+        double correction = MathUtil.clamp(
+            headingHoldController.calculate(heading.getRadians(), headingHoldTarget.get().getRadians()),
+            -maxOmegaRadPerSec,
+            maxOmegaRadPerSec);
+        Logger.recordOutput("Swerve/HeadingHold/Active", true);
+        Logger.recordOutput("Swerve/HeadingHold/Target", headingHoldTarget.get());
+        Logger.recordOutput("Swerve/HeadingHold/Error_rad", headingHoldController.getError());
+        Logger.recordOutput("Swerve/HeadingHold/Correction_radps", correction);
+        return omegaRadPerSec + correction;
     }
 
     /**
@@ -308,92 +375,6 @@ public class DriveSubsystem extends SubsystemBase {
      */
     public void setRobotRelative(boolean enabled) {
         this.robotRelativeEnabled = enabled;
-    }
-
-    /**
-     * Gets whether boost mode is currently enabled.
-     *
-     * @return true if boost mode is enabled
-     */
-    public boolean isBoostModeEnabled() {
-        return boostModeEnabled;
-    }
-
-    /**
-     * Limits acceleration but allows full deceleration
-     *
-     * @param desiredSpeeds The desired chassis speeds
-     * @return Limited chassis speeds
-     */
-    private ChassisSpeeds limitAcceleration(ChassisSpeeds desiredSpeeds) {
-        double currentTime = Timer.getFPGATimestamp();
-        double dt = currentTime - lastUpdateTime;
-
-        // If this is the first update or dt is too large, don't limit
-        if (lastUpdateTime == 0.0 || dt > 0.1 || dt <= 0.0) {
-            lastUpdateTime = currentTime;
-            previousSpeeds = desiredSpeeds;
-            return desiredSpeeds;
-        }
-
-        // Calculate current linear velocity magnitude
-        double currentLinearVel = Math.hypot(previousSpeeds.vxMetersPerSecond, previousSpeeds.vyMetersPerSecond);
-        double desiredLinearVel = Math.hypot(desiredSpeeds.vxMetersPerSecond, desiredSpeeds.vyMetersPerSecond);
-
-        // Limit both acceleration and deceleration
-        double vx = desiredSpeeds.vxMetersPerSecond;
-        double vy = desiredSpeeds.vyMetersPerSecond;
-        double deltaV = desiredLinearVel - currentLinearVel;
-
-        if (deltaV > 0) {
-            // We're accelerating - apply acceleration limits
-            double maxDeltaV = maxLinearAcceleration.get() * dt;
-            if (deltaV > maxDeltaV) {
-                double limitedLinearVel = currentLinearVel + maxDeltaV;
-                double scale = limitedLinearVel / desiredLinearVel;
-                vx = desiredSpeeds.vxMetersPerSecond * scale;
-                vy = desiredSpeeds.vyMetersPerSecond * scale;
-            }
-        } else if (deltaV < 0) {
-            // We're decelerating - apply deceleration limits
-            double maxDeltaV = maxLinearDeceleration.get() * dt;
-            if (-deltaV > maxDeltaV) {
-                double limitedLinearVel = currentLinearVel - maxDeltaV;
-                if (desiredLinearVel > 0.001) {
-                    double scale = limitedLinearVel / desiredLinearVel;
-                    vx = desiredSpeeds.vxMetersPerSecond * scale;
-                    vy = desiredSpeeds.vyMetersPerSecond * scale;
-                } else {
-                    // Decelerating toward zero - use direction from previous speeds
-                    double prevMag = Math.hypot(previousSpeeds.vxMetersPerSecond, previousSpeeds.vyMetersPerSecond);
-                    if (prevMag > 0.001) {
-                        vx = (previousSpeeds.vxMetersPerSecond / prevMag) * limitedLinearVel;
-                        vy = (previousSpeeds.vyMetersPerSecond / prevMag) * limitedLinearVel;
-                    }
-                }
-            }
-        }
-
-        // Limit angular acceleration and deceleration separately
-        double omega = desiredSpeeds.omegaRadiansPerSecond;
-        double deltaOmega = omega - previousSpeeds.omegaRadiansPerSecond;
-
-        // Determine if we're accelerating or decelerating (speeding up or slowing down
-        // rotation)
-        boolean isAngularAccelerating = Math.abs(omega) > Math.abs(previousSpeeds.omegaRadiansPerSecond);
-        double maxDeltaOmega =
-            (isAngularAccelerating ? maxAngularAcceleration.get() : maxAngularDeceleration.get()) * dt;
-
-        if (Math.abs(deltaOmega) > maxDeltaOmega) {
-            omega = previousSpeeds.omegaRadiansPerSecond + Math.signum(deltaOmega) * maxDeltaOmega;
-        }
-
-        ChassisSpeeds limitedSpeeds = new ChassisSpeeds(vx, vy, omega);
-
-        lastUpdateTime = currentTime;
-        previousSpeeds = limitedSpeeds;
-
-        return limitedSpeeds;
     }
 
     /**
@@ -529,12 +510,11 @@ public class DriveSubsystem extends SubsystemBase {
         return kinematics.toChassisSpeeds(getModuleStates());
     }
 
+    /** Drives at these robot-relative speeds. The setpoint generator keeps every module under MAX_VEL. */
     public void setRobotRelativeDrivePowers(ChassisSpeeds robotRelativeSpeeds) {
-        SwerveModuleState[] states = kinematics.toSwerveModuleStates(robotRelativeSpeeds);
-        SwerveDriveKinematics.desaturateWheelSpeeds(
-            states, robotRelativeSpeeds,
-            MAX_VEL, MAX_VEL, MAX_OMEGA);
-        desiredStates = states;
+        // Whatever is driving this way controls its own heading
+        headingHoldTarget = Optional.empty();
+        desiredSpeeds = robotRelativeSpeeds;
     }
 
     /**
@@ -550,24 +530,5 @@ public class DriveSubsystem extends SubsystemBase {
             xPower * MAX_VEL,
             yPower * MAX_VEL,
             angularPower * MAX_OMEGA));
-    }
-
-    /**
-     * Sets the drive speed limit multiplier. This scales max velocity and
-     * acceleration.
-     *
-     * @param limit [0, 1] fraction of max speed. 1.0 = full speed, 0.0 = stopped.
-     */
-    public void setDriveSpeedLimit(double limit) {
-        this.driveSpeedLimit = Math.max(0.0, Math.min(1.0, limit));
-    }
-
-    /**
-     * Gets the current drive speed limit.
-     *
-     * @return The current speed limit multiplier [0, 1]
-     */
-    public double getDriveSpeedLimit() {
-        return driveSpeedLimit;
     }
 }

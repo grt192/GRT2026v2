@@ -19,15 +19,36 @@ public class LoggedTracer {
 
     private static double startTime = -1.0;
 
+    // Longest epoch since the last reset, so a loop overrun can name what was slow
+    private static String slowestEpochName = "";
+    private static double slowestEpochSecs = 0.0;
+
     /** Reset the clock. */
     public static void reset() {
         startTime = Timer.getFPGATimestamp();
+        slowestEpochName = "";
+        slowestEpochSecs = 0.0;
     }
 
     /** Save the time elapsed since the last reset or record. */
     public static void record(String epochName) {
         double now = Timer.getFPGATimestamp();
-        Logger.recordOutput("LoggedTracer/" + epochName + "MS", (now - startTime) * 1000.0);
+        double elapsedSecs = now - startTime;
+        Logger.recordOutput("LoggedTracer/" + epochName + "MS", elapsedSecs * 1000.0);
+        if (elapsedSecs > slowestEpochSecs) {
+            slowestEpochName = epochName;
+            slowestEpochSecs = elapsedSecs;
+        }
         startTime = now;
+    }
+
+    /** The longest epoch recorded since the last reset, or "" if none was. */
+    public static String getSlowestEpochName() {
+        return slowestEpochName;
+    }
+
+    /** How long the slowest epoch since the last reset took, in milliseconds. */
+    public static double getSlowestEpochMS() {
+        return slowestEpochSecs * 1000.0;
     }
 }

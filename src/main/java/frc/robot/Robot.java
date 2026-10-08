@@ -17,6 +17,7 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import frc.robot.util.GatedAlert;
 import frc.robot.util.LoggedCanivore;
 import frc.robot.util.LoggedTracer;
+import frc.robot.util.LoopOverrunTracker;
 import frc.robot.util.PhoenixUtil;
 
 /**
@@ -95,6 +96,7 @@ public class Robot extends LoggedRobot {
     public void robotPeriodic() {
         robotContainer.updateAlerts();
 
+        LoopOverrunTracker.update();
         LoggedTracer.reset();
 
         PhoenixUtil.refreshAllStatusSignals();

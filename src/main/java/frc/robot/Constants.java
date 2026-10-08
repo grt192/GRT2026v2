@@ -9,6 +9,7 @@ import com.ctre.phoenix6.CANBus;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.RobotBase;
 
 /**
@@ -58,6 +59,10 @@ public final class Constants {
     public static class ControllerConstants {
         // Stick deadbands (fraction of full stick travel)
         public static final double PS5_STICK_DEADBAND = 0.035;
+        // Power curves applied after the deadband (1 = linear, 2 = squared, 3 = cubed). Higher gives
+        // finer control near the center of the stick without lowering top speed
+        public static final double TRANSLATION_STICK_EXPONENT = 2.0;
+        public static final double ROTATION_STICK_EXPONENT = 2.0;
     }
 
     // ==================== DRIVETRAIN ====================
@@ -99,6 +104,10 @@ public final class Constants {
 
         // Physical Measurements
         public static final double STEER_GEAR_REDUCTION = 160.0 / 7.0; // ~22.86:1
+        // Fastest the setpoint generator will turn a module. 80% of a Kraken X44's free speed through the
+        // steer reduction, since a loaded module won't reach free speed
+        public static final double MAX_STEER_VELOCITY_RAD_PER_SEC =
+            0.8 * DCMotor.getKrakenX44(1).freeSpeedRadPerSec / STEER_GEAR_REDUCTION;
 
         // Position PID (PositionVoltage: volts per module rotation). CTRE's swerve defaults, not tuned
         // on BetaBot
@@ -115,11 +124,9 @@ public final class Constants {
         // robot loop keeps the motor controllers' closed loops stable (254 uses 5 ms too)
         public static final double PERIOD_SECONDS = 0.005;
 
-        public static final double ROBOT_MASS_KG = 60.0; // with bumpers and battery
         public static final double BUMPER_LENGTH_X_METERS = 0.76;
         public static final double BUMPER_WIDTH_Y_METERS = 0.76;
 
-        public static final double WHEEL_COEFFICIENT_OF_FRICTION = 1.2;
         public static final double DRIVE_FRICTION_VOLTS = 0.1;
         public static final double STEER_FRICTION_VOLTS = 0.15;
         // maple-sim's COTS module default; much smaller goes numerically unstable at a 5 ms step
@@ -164,13 +171,23 @@ public final class Constants {
         public static final double MAX_VEL = SwerveDriveConstants.TRUE_MAX_DRIVE_SPEED; // 3.87 m/s
         public static final double MAX_OMEGA = MAX_VEL / FL_POS.getNorm();
 
-        // Chassis Acceleration Limits (set to max - no software limiting)
-        // increase = faster response, decrease = smoother
-        public static final double MAX_LINEAR_ACCELERATION = 7; // how fast robot speeds up (m/s²)
-        public static final double MAX_LINEAR_DECELERATION = 11; // how fast robot stops (m/s²)
+        // Physical model for the setpoint generator (and maple-sim). Mass is weighed; MOI and friction are estimates
+        public static final double ROBOT_MASS_KG = 55.0; // with bumpers and battery
+        // A uniform 0.76 m square of ROBOT_MASS_KG (m * (l² + w²) / 12). Real robots are usually close
+        public static final double ROBOT_MOI_KG_M2 = 5.3;
+        public static final double WHEEL_COEFFICIENT_OF_FRICTION = 1.2;
 
-        public static final double MAX_ANGULAR_ACCELERATION = 20; // how fast robot starts spinning (rad/s²)
-        public static final double MAX_ANGULAR_DECELERATION = 30; // how fast robot stops spinning (rad/s²)
+        // Under these speeds the drivetrain counts as commanded to stop (for the X-lock timer)
+        public static final double IDLE_LINEAR_VELOCITY_MPS = 0.01;
+        public static final double IDLE_ANGULAR_VELOCITY_RAD_PER_SEC = 0.01;
+
+        // Heading hold: keeps the robot's heading while translating with the rotation stick released.
+        // Output is rad/s per radian of heading error
+        public static final double HEADING_HOLD_KP = 4.0;
+        public static final double HEADING_HOLD_KD = 0.0;
+        // The heading is captured once the robot has stopped spinning, so it doesn't snap back to where
+        // it was when the stick was released
+        public static final double HEADING_HOLD_SETTLED_VELOCITY_RAD_PER_SEC = 0.2;
 
         // Practice starting position: 1.5 meters in front of the red hub (which is at x=11.9). Also
         // where the robot spawns in sim
