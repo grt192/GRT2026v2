@@ -159,7 +159,7 @@ public class RobotContainer {
         driveController.bindDriverHeadingReset(swerveSubsystem::resetDriverHeading, swerveSubsystem);
 
         // Triangle (hold) = align to the AprilTag in view
-        driveController.getAlignToTag().whileTrue(new AlignToTagCommand(swerveSubsystem, vision));
+        driveController.getAlignToTag().toggleOnTrue(new AlignToTagCommand(swerveSubsystem, vision));
     }
 
     /** A DualSense on port 0, on the robot and in sim */
