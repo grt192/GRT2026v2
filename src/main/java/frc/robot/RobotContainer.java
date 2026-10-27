@@ -39,7 +39,6 @@ import frc.robot.commands.allign.AimToHubCommand;
 import frc.robot.commands.auton.ShootAndLeaveAuton;
 import frc.robot.commands.intake.PivotAndRollerIntakeCommand;
 import frc.robot.controllers.BaseDriveController;
-import frc.robot.controllers.PS5DriveController;
 import frc.robot.controllers.XboxDriveController;
 import frc.robot.subsystems.fms.FieldManagementSubsystem;
 import frc.robot.subsystems.hopper.HopperIO;
@@ -457,8 +456,8 @@ public class RobotContainer {
                     return;
                 }
 
-                // R2 rests at -1 and reads 1 fully pressed, so shift it into [0, 2/3]
-                double flywheelManualVeloCommand = (mechController.getR2Axis() + 1) / 3;
+                // Xbox right trigger reads [0, 1], so scale it into [0, 2/3]
+                double flywheelManualVeloCommand = mechController.getR2Axis() * 2 / 3;
 
                 // Closed loop holding 0 fights the flywheel, so stop it outright instead
                 if (Math.abs(flywheelManualVeloCommand) > 1e-6) {
@@ -531,17 +530,10 @@ public class RobotContainer {
      * 0
      */
     private void constructController() {
-        // Sim drives with an Xbox controller, the robot with a PS5
-        if (Constants.CURRENT_MODE == Mode.REAL) {
-            driveController = new PS5DriveController();
-            driveController.setDeadZone(ControllerConstants.PS5_STICK_DEADBAND);
-        } else {
-            driveController = new XboxDriveController();
-            driveController.setDeadZone(ControllerConstants.XBOX_STICK_DEADBAND);
-        }
-        mechController = (Constants.CURRENT_MODE == Mode.REAL)
-            ? new CommandPS5Controller(1)
-            : new PS5ControllerEmulator(1);
+        // Both controllers are Xbox; the emulator keeps the PS5 button names used in the bindings
+        driveController = new XboxDriveController();
+        driveController.setDeadZone(ControllerConstants.XBOX_STICK_DEADBAND);
+        mechController = new PS5ControllerEmulator(1);
     }
 
     /**
