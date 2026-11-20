@@ -168,6 +168,19 @@ public class HoodSubsystem extends SubsystemBase {
             this::stop);
     }
 
+    public Command holdPositionThenHide(double positionRot) {
+        return this.startEnd(
+            () -> setPosition(positionRot),
+            () -> setPosition(Hood.LOWER_ANGLE_LIMIT_ROT));
+    }
+
+    public Command holdPositionThenHide(DoubleSupplier positionRotSupplier) {
+        // run(), not startEnd(), so the supplier is re-sampled every loop and the hood
+        // tracks live adjustments while the command is held.
+        return this.run(() -> setPosition(positionRotSupplier.getAsDouble()))
+            .finallyDo(() -> setPosition(Hood.LOWER_ANGLE_LIMIT_ROT));
+    }
+
     public Command hideHood() {
         return this.runOnce(() -> setPosition(Hood.LOWER_ANGLE_LIMIT_ROT))
             .andThen(Commands.waitUntil(this::atPositionSetpoint));
@@ -181,7 +194,7 @@ public class HoodSubsystem extends SubsystemBase {
         // Jiggle within the middle 50% of the hood's travel range.
         double range = Hood.UPPER_ANGLE_LIMIT_ROT - Hood.LOWER_ANGLE_LIMIT_ROT;
         double lowPos = Hood.LOWER_ANGLE_LIMIT_ROT + range * 0.25;
-        double highPos = Hood.LOWER_ANGLE_LIMIT_ROT + range * 0.25;
+        double highPos = Hood.LOWER_ANGLE_LIMIT_ROT + range * 0.75;
 
         Command jiggleHoodCommand = Commands.sequence(
             this.runOnce(() -> setPosition(highPos)),

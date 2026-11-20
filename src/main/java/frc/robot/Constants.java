@@ -59,6 +59,8 @@ public final class Constants {
     public static final boolean TUNING_MODE = true;
     public static final boolean SWERVE_ENABLED = true;
     public static final boolean MECH_ENABLED = true;
+    // Single Xbox controller on port 0 drives and runs the mechs (replaces the PS5 drive + mech controllers)
+    public static final boolean DEMO_MODE = false;
 
     // ==================== DRIVETRAIN ====================
 
@@ -272,7 +274,7 @@ public final class Constants {
             // Velocity tolerance for "at speed" check
             public static final double VELOCITY_TOLERANCE_RPS = 2.0;
 
-            public static final double FLYWHEEL_MAX_SPEED_RPS = 120.0;
+            public static final double FLYWHEEL_MAX_SPEED_RPS = 100.0;
         }
 
         // ---- Hood ----
@@ -297,9 +299,8 @@ public final class Constants {
             public static final double COM_LENGTH_M = Units.inchesToMeters(Math.hypot(0.121549, 9.035458));
 
             // Angle limits (rotations)
-            public static final double UPPER_ANGLE_LIMIT_ROT = 0.1;
+            public static final double UPPER_ANGLE_LIMIT_ROT = 0.075;
             public static final double LOWER_ANGLE_LIMIT_ROT = 0.0;
-            public static final double INIT_ANGLE_ROT = UPPER_ANGLE_LIMIT_ROT;
             public static final double MAGNET_OFFSET = -0.05688;
 
             // Current limits
@@ -322,7 +323,7 @@ public final class Constants {
         public static final double ROLLER_CURRENT_LIMIT_AMPS = 120.0;
         public static final double ROLLER_STATOR_CURRENT_LIMIT_AMPS = 120.0;
         public static final double ROLLER_OPEN_LOOP_RAMP = 0.0;
-        public static final InvertedValue ROLLER_INVERTED = InvertedValue.CounterClockwise_Positive;
+        public static final InvertedValue ROLLER_INVERTED = InvertedValue.Clockwise_Positive;
 
         // Roller Position control PID (SysID Derived - Voltage)
         public static final double ROLLER_P = 0.0930;

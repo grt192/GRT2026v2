@@ -175,6 +175,12 @@ public class TowerSubsystem extends SubsystemBase {
             this::stop);
     }
 
+    public Command runTowerDutyCycle(double dutyCycle) {
+        return this.runEnd(
+            () -> setDutyCycle(dutyCycle),
+            this::stop);
+    }
+
     public Command stopTower() {
         return this.runOnce(this::stop);
     }
