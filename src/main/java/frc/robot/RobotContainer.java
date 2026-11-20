@@ -22,8 +22,6 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
-import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.CANType;
 import frc.robot.Constants.CycleShooterConstants;
 import frc.robot.Constants.Mode;
@@ -33,11 +31,9 @@ import frc.robot.commands.AutonShooterSequence;
 import frc.robot.commands.CycleShot;
 import frc.robot.commands.SmashShot;
 import frc.robot.commands.TowerShot;
-import frc.robot.commands.allign.AimToHubCommand;
 import frc.robot.commands.auton.ShootAndLeaveAuton;
 import frc.robot.commands.intake.PivotAndRollerIntakeCommand;
 import frc.robot.controllers.PS5DriveController;
-import frc.robot.controllers.XboxDriveController;
 import frc.robot.subsystems.fms.FieldManagementSubsystem;
 import frc.robot.subsystems.hopper.HopperIO;
 import frc.robot.subsystems.hopper.HopperIOTalonFX;
@@ -102,8 +98,6 @@ public class RobotContainer {
 
     private final SendableChooser<Command> autoChooser = new SendableChooser<>();
     private PS5DriveController driveController;
-    private CommandPS5Controller mechController;
-    private XboxDriveController demoController;
     private final LoggedCanivore swerveCan = new LoggedCanivore(CANType.SWERVE);
     private final LoggedCanivore mechCan = new LoggedCanivore(CANType.MECH);
 
@@ -122,18 +116,11 @@ public class RobotContainer {
         (Constants.SWERVE_ENABLED && swerveSubsystem != null)
             ? new AimSubsystem(swerveSubsystem, fmsSubsystem)
             : null;
-    private final AimToHubCommand aimHelper =
-        (Constants.SWERVE_ENABLED && swerveSubsystem != null)
-            ? new AimToHubCommand(swerveSubsystem, fmsSubsystem)
-            : null;
 
     private final VisionSubsystem vision;
     private UsbCamera driverCam;
 
-    private double desiredHoodSpeed = 0;
-
-    private final Alert driveControllerDisconnectedAlert = new Alert("Drive Controller Disconnected", AlertType.kWarning);
-    private final Alert mechControllerDisconnectedAlert = new Alert("Mech Controller Disconnected", AlertType.kWarning);
+    private final Alert controllerDisconnectedAlert = new Alert("Controller Disconnected", AlertType.kWarning);
 
     /**
      * The container for the robot. Contains subsystems, OI devices, and commands.
@@ -221,288 +208,61 @@ public class RobotContainer {
 
     /** Update controller-connection alerts. Call from {@link Robot#robotPeriodic()}. */
     public void updateAlerts() {
-        driveControllerDisconnectedAlert.set(!DriverStation.isJoystickConnected(0));
-        mechControllerDisconnectedAlert.set(
-            !Constants.DEMO_MODE && !DriverStation.isJoystickConnected(mechController.getHID().getPort()));
+        controllerDisconnectedAlert.set(!DriverStation.isJoystickConnected(0));
     }
 
     /**
-     * Use this method to define your trigger->command mappings. Triggers can be
-     * created via the
-     * {@link Trigger#Trigger(java.util.function.BooleanSupplier)} constructor with
-     * an arbitrary
-     * predicate, or via the named f`actories in {@link
-     * edu.wpi.first.wpilibj2.command.button.CommandGenericHID}'s subclasses for
-     * {@link
-     * CommandXboxController
-     * Xbox}/{@link edu.wpi.first.wpilibj2.command.button.CommandPS4Controller
-     * PS4} controllers or
-     * {@link edu.wpi.first.wpilibj2.command.button.CommandJoystick Flight
-     * joysticks}.
+     * One PS5 controller on port 0 drives the swerve and runs every mech, with
+     * live cycle-shot tuning on the D-pad.
      */
-
     private void configureBindings() {
-        if (Constants.DEMO_MODE) {
-            configureDemoBindings();
-            return;
-        }
-
-        /*
-         * Driving -- One joystick controls translation, the other rotation. If the
-         * robot-relative button is held down,
-         * the robot is controlled along its own axes, otherwise controls apply to the
-         * field axes by default. If the
-         * swerve aim button is held down, the robot will rotate automatically to always
-         * face a target, and only
-         * translation will be manually controllable.
-         */
         if (Constants.SWERVE_ENABLED && swerveSubsystem != null) {
-            swerveSubsystem.setDefaultCommand(
-                new RunCommand(() -> {
-                    // R2 (>= 90% pressed) = boost mode
-                    swerveSubsystem.setBoostMode(driveController.getRightTriggerAxis() > 0.9);
-
-                    // L1 (hold) = robot-relative drive; release returns to field-relative
-                    swerveSubsystem.setRobotRelative(driveController.getLeftBumper());
-
-                    // R1 = slow mode (30% speed), L2 = variable speed limit
-                    double speedLimit;
-                    if (driveController.getRightBumper()) {
-                        speedLimit = Constants.SwerveConstants.SLOW_MODE_SPEED_LIMIT;
-                    } else {
-                        double leftTrigger = driveController.getLeftTriggerAxis();
-                        speedLimit = 1.0 - leftTrigger;
-                    }
-                    swerveSubsystem.setDriveSpeedLimit(speedLimit);
-
-                    swerveSubsystem.setDrivePowers(
-                        driveController.getForwardPower(),
-                        driveController.getLeftPower(),
-                        driveController.getRotatePower());
-                },
-                    swerveSubsystem));
-
-            // Create button = switch cameras
-            // driveController.create().onTrue(
-            // Commands.runOnce(() -> {
-            // if (isCamera1Active) {
-            // cameraServer.setSource(camera2);
-            // } else {
-            // cameraServer.setSource(camera1);
-            // }
-            // isCamera1Active = !isCamera1Active;
-            // }));
-
-            /* Pressing the button resets the field axes to the current robot axes. */
-            driveController.bindDriverHeadingReset(
-                () -> {
-                    swerveSubsystem.resetDriverHeading();
-                },
-                swerveSubsystem);
-
-            // Triangle (drive) = auto-rotate to face the hub. Held-while-true; rotating
-            // the right stick past the deadband cancels it so the driver can override.
-            // Wrapped in Commands.defer so the target angle is recomputed at every press.
-            if (aimHelper != null) {
-                driveController.getController().triangle().whileTrue(
-                    Commands.defer(
-                        () -> aimHelper.createAimCommand(() -> false),
-                        java.util.Set.of(swerveSubsystem)));
-            }
-
-            driveController.getController().L2().whileTrue(hood.holdDownHood());
-        }
-        if (Constants.MECH_ENABLED) {
-            // ==================== INTAKE ROLLER ====================
-            // R1 (mech) = intake out, L1 (mech) = intake in (duty cycle control)
-            mechController.L1().whileTrue(roller.runRollerIn());
-            mechController.R1().whileTrue(roller.runRollerOut());
-            roller.setDefaultCommand(roller.stopRoller());
-
-            // ==================== INTAKE PIVOT ====================
-            // D-pad left = pivot down (timed), D-pad right = pivot up (timed)
-            mechController.povLeft().whileTrue(pivot.deployPivot());
-            mechController.povRight().whileTrue(pivot.retractPivot());
-
-            // L2 (mech) = spin spindexer (hopper) at max RPM and tower at full duty cycle
-            mechController.L2().whileTrue(Commands.run(() -> {
-                hopper.setDutyCycle(-1.0); // Max duty cycle for spindexer
-                tower.setDutyCycle(1.0); // Full duty cycle for tower
-            }, hopper, tower));
-            hopper.setDefaultCommand(hopper.stopHopper());
-
-            // Square (drive) = emergency force intake in (pivot up + stop rollers) - hold to override
-            driveController.square()
-                .whileTrue(Commands.parallel(pivot.retractPivot(), roller.stopRoller()));
-
-            // ==================== INTAKE PIVOT ====================
-            // Right stick Y controls pivot manually
-            /*
-             * pivotIntake.setDefaultCommand(Commands.run(() -> {
-             * double pivotInput = -mechController.getRightY();
-             * if (Math.abs(pivotInput) > 0.1) {
-             * pivotIntake.setManualSpeed(pivotInput * 0.3);
-             * } else {
-             * pivotIntake.stop();
-             * }
-             * }, pivotIntake));
-             */
-
-            // ==================== SHOOTING PRESETS ====================
-            // Square (mech) = smash-and-shoot preset (close-range)
-            mechController.square().whileTrue(
-                Commands.defer(
-                    () -> new SmashShot(
-                        flywheel,
-                        hood,
-                        tower,
-                        hopper,
-                        pivot),
-                    java.util.Set.of(
-                        flywheel,
-                        hood,
-                        hopper,
-                        tower,
-                        pivot)));
-
-            // ==================== INTERPOLATION TABLE CALIBRATION ====================
-            // D-pad up/down: bump flywheel RPM offset (5 RPS per press)
-            // Triangle/Circle: bump hood angle offset (0.005 rotations per press)
-            // Options: log current (distance, rpm, angle) to riolog
-            // Share: reset both offsets to zero
-            // mechController.povUp().onTrue(CalibrationCommands.rpmUp(learner));
-            // mechController.povDown().onTrue(CalibrationCommands.rpmDown(learner));
-            // mechController.triangle().onTrue(CalibrationCommands.hoodUp(learner));
-            // mechController.circle().onTrue(CalibrationCommands.hoodDown(learner));
-            // mechController.create().onTrue(CalibrationCommands.resetOffsets(learner));
-            // if (aimSubsystem != null) {
-            // mechController.options().onTrue(CalibrationCommands.logPoint(learner, aimSubsystem));
-            // }
-
-            // Joystick movement cancels it
-            // Trigger joystickMoved = new Trigger(() -> Math.abs(driveController.getForwardPower()) > 0.1 ||
-            // Math.abs(driveController.getLeftPower()) > 0.1 ||
-            // Math.abs(driveController.getRotatePower()) > 0.1);
-            // joystickMoved.onTrue(Commands.runOnce(() -> manualShooterCmd.cancel()));
-
-            // ==================== SHOOTER ====================
-            // R2 = flywheel (analog speed control)
-            // Left stick Y = hood manual control
-            flywheel.setDefaultCommand(Commands.run(() -> {
-                if (!DriverStation.isJoystickConnected(1)) {
-                    flywheel.stop();
-                    return;
-                }
-
-                // R2 rests at -1 and reads 1 fully pressed, so shift it into [0, 2/3]
-                double flywheelManualVeloCommand = (mechController.getR2Axis() + 1) / 3;
-
-                // Closed loop holding 0 fights the flywheel, so stop it outright instead
-                if (Math.abs(flywheelManualVeloCommand) > 1e-6) {
-                    flywheel.setVelocity(flywheelManualVeloCommand);
-                } else {
-                    flywheel.stop();
-                }
-            }, flywheel));
-
-            tower.setDefaultCommand(Commands.run(() -> {
-                tower.stop(); // Stop tower by default
-            }, tower));
-
-            hood.setDefaultCommand(Commands.run(() -> {
-                if (mechController.L3().getAsBoolean()) {
-                    desiredHoodSpeed = 0.15;
-                    hood.setDutyCycle(0.15);
-                } else if (mechController.R3().getAsBoolean()) {
-                    desiredHoodSpeed = -0.15;
-                    hood.setDutyCycle(-0.15);
-                } else {
-                    if (desiredHoodSpeed != 0) {
-                        desiredHoodSpeed = 0;
-                        hood.stop();
-
-                    }
-                }
-            }, hood));
-
-            mechController.povUp().onTrue(Commands.runOnce(() -> {
-                if (Flywheel.FLYWHEEL_MAX_SPEED_RPS > cycleFlywheelVelo) {
-                    cycleFlywheelVelo += 5;
-                }
-            }));
-
-            mechController.povDown().onTrue(Commands.runOnce(() -> {
-                if (cycleFlywheelVelo > 0) {
-                    cycleFlywheelVelo -= 5;
-                }
-            }));
-
-            // Cross = passing shot — flywheel pinned to max (120 RPS)
-            mechController.cross().whileTrue(new CycleShot(
-                flywheel,
-                hood,
-                tower,
-                hopper,
-                () -> cycleFlywheelVelo));
-
-            // Touchpad = tower shoot preset
-            mechController.triangle().whileTrue(new TowerShot(
-                flywheel,
-                hood,
-                tower,
-                hopper,
-                pivot));
-
-            // Swerve-dependent drive controller commands
-            if (Constants.SWERVE_ENABLED && swerveSubsystem != null) {
-                // Options button = reset pose to starting position (in front of red hub)
-                driveController.options()
-                    .onTrue(Commands.runOnce(() -> swerveSubsystem.resetToStartingPosition(), swerveSubsystem));
-            }
-        }
-
-    }
-
-    /**
-     * Demo mode bindings: one Xbox controller on port 0 drives the swerve and runs
-     * every mech, with live cycle-shot tuning on the D-pad.
-     */
-    private void configureDemoBindings() {
-        if (Constants.SWERVE_ENABLED && swerveSubsystem != null) {
+            // Left stick = translate, right stick = rotate (field-relative)
             swerveSubsystem.setDefaultCommand(
                 new RunCommand(() -> {
                     swerveSubsystem.setDriveSpeedLimit(1.0);
                     swerveSubsystem.setDrivePowers(
-                        demoController.getForwardPower(),
-                        demoController.getLeftPower(),
-                        demoController.getRotatePower());
+                        driveController.getForwardPower(),
+                        driveController.getLeftPower(),
+                        driveController.getRotatePower());
                 }, swerveSubsystem));
 
-            /* Pressing the button resets the field axes to the current robot axes. */
-            demoController.bindDriverHeadingReset(
+            // Cross = reset the field axes to the current robot axes
+            driveController.bindDriverHeadingReset(
                 () -> {
                     swerveSubsystem.resetDriverHeading();
                 }, swerveSubsystem);
+
+            // Options = reset pose to starting position (in front of red hub)
+            driveController.options()
+                .onTrue(Commands.runOnce(() -> swerveSubsystem.resetToStartingPosition(), swerveSubsystem));
         }
         if (Constants.MECH_ENABLED) {
-            CommandXboxController controller = demoController.getController();
+            CommandPS5Controller controller = driveController.getController();
 
-            controller.rightBumper().whileTrue(
+            // R1 (hold) = cycle shot at the live-tuned flywheel velocity and hood position
+            controller.R1().whileTrue(
                 new CycleShot(flywheel, hood, tower, hopper, pivot, () -> cycleFlywheelVelo, () -> cycleHoodPos));
-            controller.rightTrigger().whileTrue(roller.runRollerOut());
+            // R2 (hold) = roller out
+            controller.R2().whileTrue(roller.runRollerOut());
 
-            controller.leftBumper().toggleOnTrue(pivot.togglePivot());
-            controller.leftTrigger().whileTrue(roller.runRollerIn());
+            // L1 = toggle pivot, L2 (hold) = roller in
+            controller.L1().toggleOnTrue(pivot.togglePivot());
+            controller.L2().whileTrue(roller.runRollerIn());
 
-            controller.y().toggleOnTrue(new SmashShot(flywheel, hood, tower, hopper, pivot));
-            controller.a().toggleOnTrue(new TowerShot(flywheel, hood, tower, hopper, pivot));
+            // Triangle = smash shot (toggle), Circle = tower shot (toggle)
+            controller.triangle().toggleOnTrue(new SmashShot(flywheel, hood, tower, hopper, pivot));
+            controller.circle().toggleOnTrue(new TowerShot(flywheel, hood, tower, hopper, pivot));
 
+            // Square = jiggle pivot and hood (toggle)
+            controller.square().toggleOnTrue(Commands.parallel(pivot.jigglePivot(), hood.jiggleHood()));
+
+            // D-pad up/down = cycle flywheel velocity, right/left = cycle hood position
             publishCycleTuning();
             controller.povUp().onTrue(
                 Commands.runOnce(() -> adjustCycleFlywheelVelo(CYCLE_FLYWHEEL_VELO_STEP_RPS)));
             controller.povDown().onTrue(
                 Commands.runOnce(() -> adjustCycleFlywheelVelo(-CYCLE_FLYWHEEL_VELO_STEP_RPS)));
-
             controller.povRight().onTrue(
                 Commands.runOnce(() -> adjustCycleHoodPos(CYCLE_HOOD_POS_STEP_ROT)));
             controller.povLeft().onTrue(
@@ -511,8 +271,6 @@ public class RobotContainer {
             roller.setDefaultCommand(roller.stopRoller());
             hopper.setDefaultCommand(hopper.stopHopper());
             tower.setDefaultCommand(tower.stopTower());
-
-            controller.b().toggleOnTrue(Commands.parallel(pivot.jigglePivot(), hood.jiggleHood()));
         }
     }
 
@@ -538,20 +296,10 @@ public class RobotContainer {
         Logger.recordOutput("CycleShot/HoodPosRotations", cycleHoodPos - CycleShooterConstants.HOOD_POSITION_ROT);
     }
 
-    /**
-     * Constructs the drive controller based on the name of the controller at port
-     * 0
-     */
+    /** Constructs the single PS5 controller on port 0. */
     private void constructController() {
-        if (Constants.DEMO_MODE) {
-            demoController = new XboxDriveController();
-            demoController.setDeadZone(0.035);
-            return;
-        }
-
         driveController = new PS5DriveController();
         driveController.setDeadZone(0.035);
-        mechController = new CommandPS5Controller(1);
     }
 
     /**
