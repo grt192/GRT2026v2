@@ -124,11 +124,11 @@ public class FlywheelSubsystem extends SubsystemBase {
 
     /** Full voltage while under the target, plus a scaled kS/kV feedforward so it doesn't sag as hard. */
     private void applyBangBang() {
-        double bangBangVolts = bangBang.calculate(inputs.velocityRPS, bangBangTargetRPS) * 12.0;
+        double bangBangVolts = bangBang.calculate(inputs.velocityRPS, bangBangTargetRPS) * 13.0;
         double feedforwardVolts = bangBangTargetRPS > 0.0
             ? BANG_BANG_FEEDFORWARD_SCALE * (kS.get() + kV.get() * bangBangTargetRPS)
             : 0.0;
-        double volts = MathUtil.clamp(bangBangVolts + feedforwardVolts, 0.0, 12.0);
+        double volts = MathUtil.clamp(bangBangVolts + feedforwardVolts, 0.0, 13.0);
         io.setVoltageOut(volts);
         Logger.recordOutput("Flywheel/BangBang/OutputVolts", volts);
     }
