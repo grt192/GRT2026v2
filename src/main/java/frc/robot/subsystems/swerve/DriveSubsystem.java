@@ -94,6 +94,11 @@ public class DriveSubsystem extends SubsystemBase {
     // Steps desiredSpeeds toward what the modules can physically do in one loop (steering speed, motor
     // torque, wheel grip). It also discretizes the speeds, so nothing upstream should
     private final SwerveSetpointGenerator setpointGenerator;
+    // When the generator last stepped, so each step covers the time that really passed. Assuming the
+    // nominal 20 ms would cut acceleration and braking whenever loops overrun
+    private double lastSetpointTimestamp = -1.0;
+    // Longer gaps (after a pause or a long overrun) are capped so one step can't jump the setpoint
+    private static final double MAX_SETPOINT_DT_SECS = 0.1;
     private SwerveSetpoint previousSetpoint = new SwerveSetpoint(
         new ChassisSpeeds(),
         new SwerveModuleState[] {
@@ -207,6 +212,7 @@ public class DriveSubsystem extends SubsystemBase {
         if (DriverStation.isDisabled() || locked) {
             // The modules aren't following the generator here, so restart it from where they really are
             previousSetpoint = new SwerveSetpoint(getRobotRelativeChassisSpeeds(), getModuleStates(), DriveFeedforwards.zeros(4));
+            lastSetpointTimestamp = -1.0;
         }
 
         // Lock the swerve module if the lock timeout has elapsed, or set them to their
@@ -214,7 +220,13 @@ public class DriveSubsystem extends SubsystemBase {
         if (locked) {
             applyLock();
         } else {
-            previousSetpoint = setpointGenerator.generateSetpoint(previousSetpoint, desiredSpeeds, LoggedRobot.defaultPeriodSecs);
+            double now = Timer.getTimestamp();
+            double dtSecs = lastSetpointTimestamp < 0.0
+                ? LoggedRobot.defaultPeriodSecs
+                : MathUtil.clamp(now - lastSetpointTimestamp, 0.0, MAX_SETPOINT_DT_SECS);
+            lastSetpointTimestamp = now;
+            Logger.recordOutput("Swerve/SetpointDtMS", dtSecs * 1000.0);
+            previousSetpoint = setpointGenerator.generateSetpoint(previousSetpoint, desiredSpeeds, dtSecs);
             for (int i = 0; i < 4; i++) {
                 modules[i].setModuleState(previousSetpoint.moduleStates()[i]);
             }

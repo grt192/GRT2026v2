@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
+import com.ctre.phoenix6.configs.CurrentLimitsConfigs;
 import com.ctre.phoenix6.configs.FeedbackConfigs;
 import com.ctre.phoenix6.configs.MotionMagicConfigs;
 import com.ctre.phoenix6.configs.MotorOutputConfigs;
@@ -103,6 +104,13 @@ public class FlywheelIOTalonFX implements FlywheelIO {
 
         config.withFeedback(
             new FeedbackConfigs().withSensorToMechanismRatio(ShooterConstants.Flywheel.GEAR_RATIO));
+
+        // Applied to both motors, since the follower gets the same config
+        config.withCurrentLimits(new CurrentLimitsConfigs()
+            .withSupplyCurrentLimitEnable(true)
+            .withSupplyCurrentLimit(ShooterConstants.Flywheel.SUPPLY_CURRENT_LIMIT_AMPS)
+            .withStatorCurrentLimitEnable(true)
+            .withStatorCurrentLimit(ShooterConstants.Flywheel.STATOR_CURRENT_LIMIT_AMPS));
 
         pidConfig = new Slot0Configs()
             .withKP(ShooterConstants.Flywheel.kP)

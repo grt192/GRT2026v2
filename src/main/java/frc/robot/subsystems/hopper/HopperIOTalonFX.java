@@ -87,7 +87,9 @@ public class HopperIOTalonFX implements HopperIO {
         config.withCurrentLimits(
             new CurrentLimitsConfigs()
                 .withStatorCurrentLimitEnable(HopperConstants.STATOR_CURRENT_LIMIT_ENABLE)
-                .withStatorCurrentLimit(HopperConstants.STATOR_CURRENT_LIMIT_AMPS));
+                .withStatorCurrentLimit(HopperConstants.STATOR_CURRENT_LIMIT_AMPS)
+                .withSupplyCurrentLimitEnable(true)
+                .withSupplyCurrentLimit(HopperConstants.SUPPLY_CURRENT_LIMIT_AMPS));
 
         config.withFeedback(
             new FeedbackConfigs().withSensorToMechanismRatio(HopperConstants.GEAR_REDUCTION));

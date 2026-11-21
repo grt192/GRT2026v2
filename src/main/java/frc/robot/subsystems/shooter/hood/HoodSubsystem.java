@@ -27,6 +27,8 @@ import frc.robot.util.LoggedSetpointTracker;
 import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
 import frc.robot.util.PIDConstants;
+import frc.robot.Constants;
+import frc.robot.Constants.Mode;
 
 public class HoodSubsystem extends SubsystemBase {
     private final HoodIO io;
@@ -49,8 +51,11 @@ public class HoodSubsystem extends SubsystemBase {
 
     private final SysIdRoutine sysIdRoutine;
 
-    @AutoLogOutput(key = "Hood/Mechanism2D")
     private final LoggedMechanism2d mechanism = new LoggedMechanism2d(1.0, 1.0);
+    // Logged only in sim: serializing it every loop costs loop time on the real robot. AdvantageKit
+    // skips null, so this logs nothing off sim
+    @AutoLogOutput(key = "Hood/Mechanism2D")
+    private final LoggedMechanism2d simLoggedMechanism = Constants.CURRENT_MODE == Mode.SIM ? mechanism : null;
     private final LoggedMechanismRoot2d mechanismRoot = mechanism.getRoot("Hood", 0.5, 0.2);
     private final LoggedMechanismLigament2d hoodMech =
         mechanismRoot.append(new LoggedMechanismLigament2d(

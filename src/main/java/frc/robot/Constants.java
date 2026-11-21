@@ -59,20 +59,27 @@ public final class Constants {
 
     // debug mode / pushing hella stuff to NT tables
     // Subsystem Enable/Disable
-    public static final boolean TUNING_MODE = true;
+    public static final boolean TUNING_MODE = false;
     public static final boolean SWERVE_ENABLED = true;
     public static final boolean MECH_ENABLED = true;
 
     // ==================== DRIVETRAIN ====================
+
+    public static class ControllerConstants {
+        // Power curves applied to the sticks after the deadband (1 = linear, 2 = squared, 3 = cubed).
+        // Higher gives finer control near the center of the stick without lowering top speed
+        public static final double TRANSLATION_STICK_EXPONENT = 2.0;
+        public static final double ROTATION_STICK_EXPONENT = 2.0;
+    }
 
     public static class SwerveDriveConstants {
 
         // Motor Configuration
 
         // Current Limits
-        public static final double DRIVE_SUPPLY_CURRENT_LIMIT = 70;
+        public static final double DRIVE_SUPPLY_CURRENT_LIMIT = 30;
 
-        public static final double DRIVE_STATOR_CURRENT_LIMIT = 120;
+        public static final double DRIVE_STATOR_CURRENT_LIMIT = 90;
 
         public static final boolean DRIVE_CURRENT_LIMIT_ENABLE = true;
 
@@ -96,7 +103,7 @@ public final class Constants {
 
     public static class SwerveSteerConstants {
         // Current Limits (optimized for Kraken motors - steer needs less current)
-        public static final double STEER_SUPPLY_CURRENT_LIMIT = 30; // Prevents brownouts
+        public static final double STEER_SUPPLY_CURRENT_LIMIT = 20; // Prevents brownouts
         public static final double STEER_STATOR_CURRENT_LIMIT = 50; // Sufficient for steering
         public static final boolean STEER_CURRENT_LIMIT_ENABLE = true;
 
@@ -201,7 +208,7 @@ public final class Constants {
         public static final double ODOMETRY_THETA_STD_DEV_RAD = 0.002;
 
         // Odometry sample rate on a CAN FD bus; non-FD buses fall back to 100 Hz
-        public static final double ODOMETRY_FREQUENCY_FD_HZ = 250.0;
+        public static final double ODOMETRY_FREQUENCY_FD_HZ = 100.0; // 250 Hz overran the loop logging every sample
         public static final double ODOMETRY_FREQUENCY_HZ = 100.0;
 
         // PathPlanner Auto PID Constants
@@ -258,9 +265,9 @@ public final class Constants {
         public static final double MM_JERK_RPS3 = 100.0;
 
         // Current limits
-        public static final double SUPPLY_CURRENT_LIMIT_AMPS = 80.0;
-        public static final double STATOR_CURRENT_LIMIT_AMPS = 120.0;
-        public static final boolean STATOR_CURRENT_LIMIT_ENABLE = false;
+        public static final double SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
+        public static final double STATOR_CURRENT_LIMIT_AMPS = 60.0;
+        public static final boolean STATOR_CURRENT_LIMIT_ENABLE = true;
 
         // Motor config
         public static final InvertedValue HOPPER_INVERTED = InvertedValue.Clockwise_Positive;
@@ -298,6 +305,11 @@ public final class Constants {
             public static final double VELOCITY_TOLERANCE_RPS = 2.0;
 
             public static final double FLYWHEEL_MAX_SPEED_RPS = 100.0;
+
+            // Current limits (per motor). Bang-bang drives full voltage, so without these each motor
+            // pulled up to 130 A stator while spinning up and sagged the battery
+            public static final double SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
+            public static final double STATOR_CURRENT_LIMIT_AMPS = 80.0;
         }
 
         // ---- Hood ----
@@ -343,8 +355,8 @@ public final class Constants {
         public static final double ROLLER_IN_SPEED_RPS = 50.0;
         public static final double ROLLER_OUT_SPEED_RPS = -85.0;
         public static final double ROLLER_VELOCITY_TOLERANCE_RPS = 5.0;
-        public static final double ROLLER_CURRENT_LIMIT_AMPS = 25.0;
-        public static final double ROLLER_STATOR_CURRENT_LIMIT_AMPS = 120.0;
+        public static final double ROLLER_CURRENT_LIMIT_AMPS = 35.0;
+        public static final double ROLLER_STATOR_CURRENT_LIMIT_AMPS = 60.0;
         public static final double ROLLER_OPEN_LOOP_RAMP = 0.0;
         public static final InvertedValue ROLLER_INVERTED = InvertedValue.Clockwise_Positive;
 
@@ -440,9 +452,9 @@ public final class Constants {
         public static final double TARGET_RPS = TARGET_BPS / 4.0; // divided by 4 cuz 4 vains on spinner
 
         // Current limits
-        public static final double SUPPLY_CURRENT_LIMIT_AMPS = 80.0;
-        public static final double STATOR_CURRENT_LIMIT_AMPS = 120.0;
-        public static final boolean STATOR_CURRENT_LIMIT_ENABLE = false;
+        public static final double SUPPLY_CURRENT_LIMIT_AMPS = 40.0;
+        public static final double STATOR_CURRENT_LIMIT_AMPS = 60.0;
+        public static final boolean STATOR_CURRENT_LIMIT_ENABLE = true;
 
         // Voltage and ramping
         public static final double OPEN_LOOP_RAMP = 0.5;

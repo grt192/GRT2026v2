@@ -85,7 +85,9 @@ public class TowerIOTalonFX implements TowerIO {
         config.withCurrentLimits(
             new CurrentLimitsConfigs()
                 .withStatorCurrentLimitEnable(TowerConstants.STATOR_CURRENT_LIMIT_ENABLE)
-                .withStatorCurrentLimit(TowerConstants.STATOR_CURRENT_LIMIT_AMPS));
+                .withStatorCurrentLimit(TowerConstants.STATOR_CURRENT_LIMIT_AMPS)
+                .withSupplyCurrentLimitEnable(true)
+                .withSupplyCurrentLimit(TowerConstants.SUPPLY_CURRENT_LIMIT_AMPS));
 
         // Velocity control PID (Slot 0)
         pidConfig = new Slot0Configs()

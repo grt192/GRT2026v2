@@ -20,6 +20,8 @@ import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
 import frc.robot.util.PIDConstants;
 import frc.robot.util.RollerMechanism2D;
+import frc.robot.Constants;
+import frc.robot.Constants.Mode;
 
 public class TowerSubsystem extends SubsystemBase {
     private final TowerIO io;
@@ -52,8 +54,11 @@ public class TowerSubsystem extends SubsystemBase {
     private final SysIdRoutine sysIdRoutine;
 
     private final RollerMechanism2D mechanism = new RollerMechanism2D(0.3);
-    @AutoLogOutput(key = "Tower/Mechanism2D")
     private final LoggedMechanism2d mechanism2d = mechanism.getMechanism2d();
+    // Logged only in sim: serializing it every loop costs loop time on the real robot. AdvantageKit
+    // skips null, so this logs nothing off sim
+    @AutoLogOutput(key = "Tower/Mechanism2D")
+    private final LoggedMechanism2d simLoggedMechanism = Constants.CURRENT_MODE == Mode.SIM ? mechanism2d : null;
 
     public TowerSubsystem(TowerIO io) {
         this.io = io;

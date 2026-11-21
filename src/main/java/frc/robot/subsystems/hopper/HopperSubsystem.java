@@ -24,6 +24,8 @@ import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
 import frc.robot.util.PIDConstants;
 import frc.robot.util.ComponentStatus.MotorControlMode;
+import frc.robot.Constants;
+import frc.robot.Constants.Mode;
 
 public class HopperSubsystem extends SubsystemBase {
     private final HopperIO io;
@@ -56,8 +58,11 @@ public class HopperSubsystem extends SubsystemBase {
     private final SysIdRoutine sysIdRoutine;
 
     private static final int HOPPER_VANES = 4;
-    @AutoLogOutput(key = "Hopper/Mechanism2d")
     private final LoggedMechanism2d mechanism = new LoggedMechanism2d(1.0, 1.0);
+    // Logged only in sim: serializing it every loop costs loop time on the real robot. AdvantageKit
+    // skips null, so this logs nothing off sim
+    @AutoLogOutput(key = "Hopper/Mechanism2d")
+    private final LoggedMechanism2d simLoggedMechanism = Constants.CURRENT_MODE == Mode.SIM ? mechanism : null;
     private final LoggedMechanismRoot2d mechanismRoot = mechanism.getRoot("HopperSpinner", 0.5, 0.5);
     private final LoggedMechanismLigament2d[] vaneLigaments = new LoggedMechanismLigament2d[HOPPER_VANES];
 

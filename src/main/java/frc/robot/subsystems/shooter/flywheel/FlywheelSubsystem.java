@@ -24,6 +24,8 @@ import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
 import frc.robot.util.PIDConstants;
 import frc.robot.util.RollerMechanism2D;
+import frc.robot.Constants;
+import frc.robot.Constants.Mode;
 
 public class FlywheelSubsystem extends SubsystemBase {
     private final FlywheelIO io;
@@ -67,8 +69,11 @@ public class FlywheelSubsystem extends SubsystemBase {
     private double bangBangTargetRPS = 0.0;
 
     private final RollerMechanism2D mechanism = new RollerMechanism2D(0.4);
-    @AutoLogOutput(key = "Flywheel/Mechanism2D")
     private final LoggedMechanism2d mechanism2d = mechanism.getMechanism2d();
+    // Logged only in sim: serializing it every loop costs loop time on the real robot. AdvantageKit
+    // skips null, so this logs nothing off sim
+    @AutoLogOutput(key = "Flywheel/Mechanism2D")
+    private final LoggedMechanism2d simLoggedMechanism = Constants.CURRENT_MODE == Mode.SIM ? mechanism2d : null;
 
     public FlywheelSubsystem(FlywheelIO io) {
         this.io = io;

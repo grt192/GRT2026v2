@@ -24,6 +24,8 @@ import frc.robot.util.LoggedSetpointTracker;
 import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
 import frc.robot.util.PIDConstants;
+import frc.robot.Constants;
+import frc.robot.Constants.Mode;
 
 public class PivotSubsystem extends SubsystemBase {
     private final PivotIO io;
@@ -55,8 +57,11 @@ public class PivotSubsystem extends SubsystemBase {
     private static final double PIVOT_ROOT_X = Units.inchesToMeters(9);
     private static final double PIVOT_ROOT_Y = Units.inchesToMeters(1.5);
 
-    @AutoLogOutput(key = "Pivot/Mechanism2D")
     private final LoggedMechanism2d mechanism = new LoggedMechanism2d(CANVAS_WIDTH_M, CANVAS_HEIGHT_M);
+    // Logged only in sim: serializing it every loop costs loop time on the real robot. AdvantageKit
+    // skips null, so this logs nothing off sim
+    @AutoLogOutput(key = "Pivot/Mechanism2D")
+    private final LoggedMechanism2d simLoggedMechanism = Constants.CURRENT_MODE == Mode.SIM ? mechanism : null;
     private final LoggedMechanismRoot2d mechanismRoot = mechanism.getRoot("Pivot", PIVOT_ROOT_X, PIVOT_ROOT_Y);
     private final LoggedMechanismLigament2d pivotMech =
         mechanismRoot.append(new LoggedMechanismLigament2d(

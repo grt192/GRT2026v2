@@ -83,7 +83,9 @@ public class RollerIOTalonFX implements RollerIO {
         config.withCurrentLimits(
             new CurrentLimitsConfigs()
                 .withStatorCurrentLimitEnable(true)
-                .withStatorCurrentLimit(IntakeConstants.ROLLER_STATOR_CURRENT_LIMIT_AMPS));
+                .withStatorCurrentLimit(IntakeConstants.ROLLER_STATOR_CURRENT_LIMIT_AMPS)
+                .withSupplyCurrentLimitEnable(true)
+                .withSupplyCurrentLimit(IntakeConstants.ROLLER_CURRENT_LIMIT_AMPS));
 
         // Velocity control PID (Slot 0)
         pidConfig = new Slot0Configs()
