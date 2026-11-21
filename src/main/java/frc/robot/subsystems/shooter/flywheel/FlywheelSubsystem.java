@@ -11,6 +11,7 @@ import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.mechanism.LoggedMechanism2d;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.BangBangController;
 import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -54,6 +55,17 @@ public class FlywheelSubsystem extends SubsystemBase {
 
     private final SysIdRoutine sysIdRoutine;
 
+    // Velocity control is WPILib bang-bang: full voltage below the target, coast above it. Runs in
+    // periodic() so it updates every loop from a fresh velocity reading
+    private final BangBangController bangBang = new BangBangController();
+    // Part of the kS/kV feedforward added under the bang-bang output. Under 1 so the feedforward alone
+    // settles a little below the target and bang-bang does the rest (WPILib's recommended 0.9)
+    private static final double BANG_BANG_FEEDFORWARD_SCALE = 0.9;
+    @AutoLogOutput(key = "Flywheel/BangBang/Active")
+    private boolean bangBangActive = false;
+    @AutoLogOutput(key = "Flywheel/BangBang/TargetRPS")
+    private double bangBangTargetRPS = 0.0;
+
     private final RollerMechanism2D mechanism = new RollerMechanism2D(0.4);
     @AutoLogOutput(key = "Flywheel/Mechanism2D")
     private final LoggedMechanism2d mechanism2d = mechanism.getMechanism2d();
@@ -85,12 +97,14 @@ public class FlywheelSubsystem extends SubsystemBase {
     }
 
     public void setDutyCycle(double speed) {
+        bangBangActive = false;
         speed = MathUtil.clamp(speed, -1.0, 1.0);
         io.setDutyCycleOut(speed);
         setpointTracker.updateSetpoint(speed, MotorControlMode.DutyCycle);
     }
 
     public void setVoltage(double volts) {
+        bangBangActive = false;
         double clampedVolts = MathUtil.clamp(volts, -12.0, 12.0);
         io.setVoltageOut(clampedVolts);
         setpointTracker.updateSetpoint(clampedVolts, MotorControlMode.Voltage);
@@ -100,12 +114,27 @@ public class FlywheelSubsystem extends SubsystemBase {
         setVoltage(volts.in(Volts));
     }
 
+    /** Spins the flywheel up to this velocity with bang-bang control. Never drives it backward. */
     public void setVelocity(double velocityRPS) {
-        io.setVelocityOut(velocityRPS);
-        setpointTracker.updateSetpoint(velocityRPS, MotorControlMode.Velocity);
+        bangBangTargetRPS = Math.max(0.0, velocityRPS);
+        bangBangActive = true;
+        setpointTracker.updateSetpoint(bangBangTargetRPS, MotorControlMode.Velocity);
+        applyBangBang();
+    }
+
+    /** Full voltage while under the target, plus a scaled kS/kV feedforward so it doesn't sag as hard. */
+    private void applyBangBang() {
+        double bangBangVolts = bangBang.calculate(inputs.velocityRPS, bangBangTargetRPS) * 12.0;
+        double feedforwardVolts = bangBangTargetRPS > 0.0
+            ? BANG_BANG_FEEDFORWARD_SCALE * (kS.get() + kV.get() * bangBangTargetRPS)
+            : 0.0;
+        double volts = MathUtil.clamp(bangBangVolts + feedforwardVolts, 0.0, 12.0);
+        io.setVoltageOut(volts);
+        Logger.recordOutput("Flywheel/BangBang/OutputVolts", volts);
     }
 
     public void stop() {
+        bangBangActive = false;
         io.stop();
         setpointTracker.setControlMode(MotorControlMode.Disabled);
     }
@@ -125,7 +154,12 @@ public class FlywheelSubsystem extends SubsystemBase {
         Logger.processInputs("Flywheel", inputs);
 
         if (DriverStation.isDisabled()) {
+            bangBangActive = false;
             setpointTracker.setControlMode(MotorControlMode.Disabled);
+        }
+
+        if (bangBangActive) {
+            applyBangBang();
         }
 
         setpointTracker.logAll();
