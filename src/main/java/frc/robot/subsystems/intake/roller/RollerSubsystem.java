@@ -32,9 +32,9 @@ public class RollerSubsystem extends SubsystemBase {
     private final LoggedTunableNumber kA;
 
     private final LoggedTunableNumber inSpeed =
-        new LoggedTunableNumber("Roller/InSpeed_rps", Math.abs(IntakeConstants.ROLLER_IN_SPEED_RPS));
+        new LoggedTunableNumber("Roller/InSpeed_rps", IntakeConstants.ROLLER_IN_SPEED_RPS);
     private final LoggedTunableNumber outSpeed =
-        new LoggedTunableNumber("Roller/OutSpeed_rps", Math.abs(IntakeConstants.ROLLER_OUT_SPEED_RPS));
+        new LoggedTunableNumber("Roller/OutSpeed_rps", IntakeConstants.ROLLER_OUT_SPEED_RPS);
 
     private final LoggedTunableNumber.Watcher pidWatcher;
 
