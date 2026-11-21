@@ -69,7 +69,7 @@ public final class Constants {
         // Power curves applied to the sticks after the deadband (1 = linear, 2 = squared, 3 = cubed).
         // Higher gives finer control near the center of the stick without lowering top speed
         public static final double TRANSLATION_STICK_EXPONENT = 2.0;
-        public static final double ROTATION_STICK_EXPONENT = 2.0;
+        public static final double ROTATION_STICK_EXPONENT = 3.0;
     }
 
     public static class SwerveDriveConstants {
