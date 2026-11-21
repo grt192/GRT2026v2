@@ -18,7 +18,6 @@ import com.pathplanner.lib.util.DriveFeedforwards;
 import com.pathplanner.lib.util.swerve.SwerveSetpoint;
 import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator3d;
@@ -31,8 +30,6 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.numbers.N1;
-import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
@@ -41,7 +38,6 @@ import frc.robot.Constants;
 import frc.robot.Constants.Mode;
 import frc.robot.Constants.SwerveDriveConstants;
 import frc.robot.Constants.SwerveSteerConstants;
-import frc.robot.subsystems.vision.TimestampedVisionUpdate;
 import frc.robot.util.LoggedTracer;
 import frc.robot.util.LoggedTunableNumber;
 
@@ -138,7 +134,7 @@ public class DriveSubsystem extends SubsystemBase {
             lastModulePositions,
             Pose3d.kZero,
             VecBuilder.fill(ODOMETRY_XY_STD_DEV_M, ODOMETRY_XY_STD_DEV_M, ODOMETRY_Z_STD_DEV_M, ODOMETRY_THETA_STD_DEV_RAD),
-            // Default vision std devs; every measurement passes its own (see addVisionMeasurements)
+            // Unused: nothing feeds vision into the estimator
             VecBuilder.fill(0.9, 0.9, 0.9, 0.9));
 
         RobotConfig robotConfig = new RobotConfig(
@@ -467,14 +463,6 @@ public class DriveSubsystem extends SubsystemBase {
         return poseEstimator.getEstimatedPosition().toPose2d();
     }
 
-    /**
-     * Where odometry thinks the robot was at a past timestamp, so a camera frame can be lined up with
-     * the robot pose it was taken from. Empty if the timestamp is older than the pose history.
-     */
-    public Optional<Pose2d> getRobotPositionAt(double timestamp) {
-        return poseEstimator.sampleAt(timestamp).map(Pose3d::toPose2d);
-    }
-
     /** Gets the full 3D pose estimate, including height and tilt (e.g. on a BUMP). */
     @AutoLogOutput(key = "Swerve/EstimatedPose3d")
     public Pose3d getRobotPose3d() {
@@ -501,19 +489,6 @@ public class DriveSubsystem extends SubsystemBase {
             pose.getY(),
             z,
             new Rotation3d(rawGyroRotation.getX(), rawGyroRotation.getY(), pose.getRotation().getRadians()));
-    }
-
-    /**
-     * Fuses a vision pose into the estimator.
-     *
-     * @param update the vision pose, its timestamp, and its [x, y, theta] std devs (z reuses the xy one)
-     */
-    public void addVisionMeasurements(TimestampedVisionUpdate update) {
-        Matrix<N3, N1> stdDevs = update.stdDevs();
-        poseEstimator.addVisionMeasurement(
-            update.pose(),
-            update.timestamp(),
-            VecBuilder.fill(stdDevs.get(0, 0), stdDevs.get(1, 0), stdDevs.get(0, 0), stdDevs.get(2, 0)));
     }
 
     /**

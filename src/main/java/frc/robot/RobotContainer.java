@@ -6,15 +6,9 @@ package frc.robot;
 
 import com.pathplanner.lib.auto.NamedCommands;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.cameraserver.CameraServer;
-import edu.wpi.first.cscore.MjpegServer;
-import edu.wpi.first.cscore.UsbCamera;
-import edu.wpi.first.util.PixelFormat;
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -24,7 +18,6 @@ import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandPS5Controller;
 import frc.robot.Constants.CANType;
 import frc.robot.Constants.CycleShooterConstants;
-import frc.robot.Constants.Mode;
 import frc.robot.Constants.ShooterConstants.Flywheel;
 import frc.robot.Constants.ShooterConstants.Hood;
 import frc.robot.Constants.SwerveConstants;
@@ -70,17 +63,9 @@ import frc.robot.subsystems.swerve.ModuleIO;
 import frc.robot.subsystems.swerve.ModuleIOTalonFX;
 import frc.robot.subsystems.swerve.ModuleIOTalonFXSim;
 import frc.robot.subsystems.swerve.SwerveDriveSim;
-import frc.robot.subsystems.vision.VisionConstants;
-import frc.robot.subsystems.vision.VisionCamera;
-import frc.robot.subsystems.vision.VisionIO;
-import frc.robot.subsystems.vision.VisionIOPhoton;
-import frc.robot.subsystems.vision.VisionSubsystem;
-import frc.robot.subsystems.vision.TimestampedVisionUpdate;
 import frc.robot.util.LoggedCanivore;
 import frc.robot.util.TracerSentinel;
-import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 
 /**
@@ -129,9 +114,6 @@ public class RobotContainer {
             ? new AimSubsystem(swerveSubsystem, fmsSubsystem)
             : null;
 
-    private final VisionSubsystem vision;
-    private UsbCamera driverCam;
-
     private final Alert controllerDisconnectedAlert = new Alert("Controller Disconnected", AlertType.kWarning);
 
     /**
@@ -146,10 +128,6 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIOTalonFX(mechCan));
                 flywheel = new FlywheelSubsystem(new FlywheelIOTalonFX(mechCan));
                 hood = new HoodSubsystem(new HoodIOTalonFX(mechCan));
-                vision = createVision(
-                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_1),
-                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_2),
-                    new VisionIOPhoton(VisionConstants.CAMERA_CONFIG_3));
                 break;
             case SIM:
                 pivot = new PivotSubsystem(new PivotIOTalonFXSim(mechCan));
@@ -158,7 +136,6 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIOTalonFXSim(mechCan));
                 flywheel = new FlywheelSubsystem(new FlywheelIOTalonFXSim(mechCan));
                 hood = new HoodSubsystem(new HoodIOTalonFXSim(mechCan));
-                vision = createVision(new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
                 break;
             case REPLAY:
             default:
@@ -168,38 +145,17 @@ public class RobotContainer {
                 tower = new TowerSubsystem(new TowerIO() {});
                 flywheel = new FlywheelSubsystem(new FlywheelIO() {});
                 hood = new HoodSubsystem(new HoodIO() {});
-                vision = createVision(new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
                 break;
         }
-        if (Constants.SWERVE_ENABLED && swerveSubsystem != null) {
-            swerveSubsystem.setPoseResetListener((pose) -> {
-                vision.resetHeading(Timer.getTimestamp(), pose.toPose2d().getRotation());
-                // Move the simulated robot along with the odometry so they stay in agreement
-                if (swerveDriveSim != null) {
-                    swerveDriveSim.teleport(pose.toPose2d());
-                }
-            });
+        if (swerveDriveSim != null) {
+            // Move the simulated robot along with the odometry so they stay in agreement
+            swerveSubsystem.setPoseResetListener((pose) -> swerveDriveSim.teleport(pose.toPose2d()));
             // The sim robot spawns at the starting pose, so start odometry there too
-            if (swerveDriveSim != null) {
-                swerveSubsystem.resetToStartingPosition();
-            }
+            swerveSubsystem.resetToStartingPosition();
         }
         constructController();
         configureBindings();
         configureAutoChooser();
-
-        if (Constants.CURRENT_MODE == Mode.REAL) {
-            // Driver cam — publishes to NT at /CameraPublisher/Driver Cam/streams
-            driverCam = CameraServer.startAutomaticCapture("Driver Cam", 0);
-            driverCam.setVideoMode(PixelFormat.kMJPEG, 640, 480, 30);
-
-            // Throttle what actually streams to the dashboard (the source-side FPS
-            // is just a hint — Arducams often ignore it). These caps are authoritative.
-            MjpegServer driverCamServer = (MjpegServer) CameraServer.getServer("serve_Driver Cam");
-            driverCamServer.setResolution(320, 240);
-            driverCamServer.setFPS(20);
-            driverCamServer.setCompression(50); // 0 = worst, 100 = best; lower = less bandwidth
-        }
 
         SmartDashboard.putData("Field", field);
         NamedCommands.registerCommand("deployIntake", pivot.deployPivot());
@@ -256,24 +212,6 @@ public class RobotContainer {
         if (swerveDriveSim != null) {
             Logger.recordOutput("Swerve/SimGroundTruthPose", swerveDriveSim.getPose3d());
         }
-    }
-
-    private VisionSubsystem createVision(VisionIO io1, VisionIO io2, VisionIO io3) {
-        boolean hasSwerve = Constants.SWERVE_ENABLED && swerveSubsystem != null;
-        Consumer<TimestampedVisionUpdate> visionConsumer = hasSwerve
-            ? swerveSubsystem::addVisionMeasurements
-            : (update) -> {
-            };
-        Supplier<Rotation2d> visionHeadingSupplier = hasSwerve
-            ? () -> swerveSubsystem.getRobotPosition().getRotation()
-            : () -> Rotation2d.kZero;
-
-        return new VisionSubsystem(
-            visionConsumer,
-            visionHeadingSupplier,
-            new VisionCamera(io1, VisionConstants.CAMERA_CONFIG_1),
-            new VisionCamera(io2, VisionConstants.CAMERA_CONFIG_2),
-            new VisionCamera(io3, VisionConstants.CAMERA_CONFIG_3));
     }
 
     /** Update controller-connection alerts. Call from {@link Robot#robotPeriodic()}. */
