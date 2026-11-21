@@ -17,12 +17,12 @@ import frc.robot.subsystems.fms.FieldManagementSubsystem;
  */
 public class AimSubsystem extends SubsystemBase {
 
-    private final SwerveSubsystem swerve;
+    private final DriveSubsystem swerve;
     private final FieldManagementSubsystem fms;
 
     private final DoublePublisher distancePub;
 
-    public AimSubsystem(SwerveSubsystem swerve, FieldManagementSubsystem fms) {
+    public AimSubsystem(DriveSubsystem swerve, FieldManagementSubsystem fms) {
         this.swerve = swerve;
         this.fms = fms;
         distancePub = NetworkTableInstance.getDefault()

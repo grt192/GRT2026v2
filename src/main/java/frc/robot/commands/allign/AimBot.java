@@ -8,17 +8,17 @@ import frc.robot.Constants.AlignConstants;
 import frc.robot.commands.allign.AimToHubCommand;
 import frc.robot.commands.allign.AimToPointCommand;
 import frc.robot.subsystems.fms.FieldManagementSubsystem;
-import frc.robot.subsystems.swerve.SwerveSubsystem;
+import frc.robot.subsystems.swerve.DriveSubsystem;
 import java.lang.reflect.Field;
 import java.util.function.BooleanSupplier;
 
 public class AimBot extends Command {
 
-    private SwerveSubsystem swerve;
+    private DriveSubsystem swerve;
     private FieldManagementSubsystem field;
     private boolean redTeam = false;
 
-    public AimBot(SwerveSubsystem swerveSubsystem, FieldManagementSubsystem fms, boolean red) {
+    public AimBot(DriveSubsystem swerveSubsystem, FieldManagementSubsystem fms, boolean red) {
         swerve = swerveSubsystem;
         field = fms;
         redTeam = red;

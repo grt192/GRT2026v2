@@ -18,6 +18,7 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import frc.robot.util.GatedAlert;
 import frc.robot.util.LoggedCanivore;
 import frc.robot.util.LoggedTracer;
+import frc.robot.util.LoopOverrunTracker;
 import frc.robot.util.PhoenixUtil;
 
 /**
@@ -98,6 +99,7 @@ public class Robot extends LoggedRobot {
     public void robotPeriodic() {
         robotContainer.updateAlerts();
 
+        LoopOverrunTracker.update();
         LoggedTracer.reset();
 
         PhoenixUtil.refreshAllStatusSignals();
@@ -169,5 +171,7 @@ public class Robot extends LoggedRobot {
 
     /** This function is called periodically whilst in simulation. */
     @Override
-    public void simulationPeriodic() {}
+    public void simulationPeriodic() {
+        robotContainer.simulationPeriodic();
+    }
 }

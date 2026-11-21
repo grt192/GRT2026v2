@@ -5,11 +5,11 @@ import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.Constants.AlignConstants;
 import frc.robot.subsystems.fms.FieldManagementSubsystem;
-import frc.robot.subsystems.swerve.SwerveSubsystem;
+import frc.robot.subsystems.swerve.DriveSubsystem;
 import java.util.function.DoubleSupplier;
 
 public class AimWhileDrivingCommand extends Command {
-    private final SwerveSubsystem swerve;
+    private final DriveSubsystem swerve;
     private final FieldManagementSubsystem fms;
 
     private final DoubleSupplier xSupplier;
@@ -21,7 +21,7 @@ public class AimWhileDrivingCommand extends Command {
     private final PIDController rotationPID = new PIDController(5.0, 0.0, 0.2);
 
     public AimWhileDrivingCommand(
-        SwerveSubsystem swerve,
+        DriveSubsystem swerve,
         FieldManagementSubsystem fms,
         DoubleSupplier xSupplier,
         DoubleSupplier ySupplier) {
