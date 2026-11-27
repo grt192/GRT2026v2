@@ -51,7 +51,7 @@
     <property name="eachLine" value="true"/>
   </module>
 
-  <!-- Local formatter override: eclipse-java-formatter.xml uses lineSplit/comment length 1000. -->
+  <!-- Local formatter override: eclipse_java_formatter_config.xml uses lineSplit/comment length 1000. -->
   <module name="LineLength">
     <property name="fileExtensions" value="java"/>
     <property name="max" value="1000"/>
@@ -311,7 +311,7 @@
       <message key="ws.notPreceded"
              value="Add the required space before {0} in this generic type expression."/>
     </module>
-    <!-- Local formatter override: eclipse-java-formatter.xml uses 4-space block indentation. -->
+    <!-- Local formatter override: eclipse_java_formatter_config.xml uses 4-space block indentation. -->
     <module name="Indentation">
       <property name="basicOffset" value="4"/>
       <property name="braceAdjustment" value="0"/>
