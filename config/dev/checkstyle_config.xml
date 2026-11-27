@@ -251,24 +251,24 @@
              value="Parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="LambdaParameterName">
-      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+      <property name="format" value="^(_|[a-z][a-zA-Z0-9]*)$"/>
       <message key="name.invalidPattern"
-             value="Lambda parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
+             value="Lambda parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits, or be just _ for an unused variable."/>
     </module>
     <module name="CatchParameterName">
-      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+      <property name="format" value="^(_|[a-z][a-zA-Z0-9]*)$"/>
       <message key="name.invalidPattern"
-             value="Catch parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
+             value="Catch parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits, or be just _ for an unused variable."/>
     </module>
     <module name="LocalVariableName">
-      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+      <property name="format" value="^(_|[a-z][a-zA-Z0-9]*)$"/>
       <message key="name.invalidPattern"
-             value="Local variable name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
+             value="Local variable name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits, or be just _ for an unused variable."/>
     </module>
     <module name="PatternVariableName">
-      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+      <property name="format" value="^(_|[a-z][a-zA-Z0-9]*)$"/>
       <message key="name.invalidPattern"
-             value="Pattern variable name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
+             value="Pattern variable name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits, or be just _ for an unused variable."/>
     </module>
     <module name="ConstantName">
       <property name="format" value="^(?!K[A-Z]$)(?:[A-Z][A-Z0-9]*(_[A-Z0-9]+)*|k[A-Z])$"/>
