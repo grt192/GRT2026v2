@@ -19,7 +19,7 @@
 - [ ] Figure out sim stuff
 
 ### Change Log:
-1. Generated checkstyle config found in `./config/checkstyle/google_checks.xml` by running the google checkstyle config on current code and making changes based on preferred outcome
+1. Generated checkstyle config found in `./config/dev/checkstyle_config.xml` by running the google checkstyle config on current code and making changes based on preferred outcome
 2. Added `LoggedCanivore` (`src/main/java/frc/robot/util/LoggedCanivore.java`) — wraps `CANBus` with a background thread that polls bus status every 400ms and auto-logs utilization, bus-off/TEC/REC counters through AdvantageKit. Idea borrowed from FRC 6328.
 3. Added `PhoenixUtil` (`src/main/java/frc/robot/util/PhoenixUtil.java`, from FRC 6328) — provides `tryUntilOk` for retrying Phoenix config calls and a per-bus `registerSignals` / `refreshAllStatusSignals` registry so every CAN bus refreshes its signals together.
 4. Replaced the `SWERVE_CAN_BUS` / `MECH_CAN_BUS` string constants with a `Constants.CANType` enum (`RIO`, `MECH`, `SWERVE`) so bus identity is type-safe and usable as a map key in `PhoenixUtil`.

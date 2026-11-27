@@ -101,7 +101,7 @@ test {
 
 checkstyle {
     toolVersion = "10.21.4"
-    configFile = file("config/checkstyle/google_checks.xml")
+    configFile = file("config/dev/checkstyle_config.xml")
     configProperties = [
         "org.checkstyle.google.severity": "error",
     ]
@@ -146,7 +146,7 @@ tasks.withType(JavaCompile) {
 // Auto-format code on build using Eclipse formatter
 spotless {
     java {
-        eclipse().configFile('eclipse-java-formatter.xml')
+        eclipse().configFile('config/dev/eclipse_java_formatter_config.xml')
         target 'src/**/*.java'
     }
 }
