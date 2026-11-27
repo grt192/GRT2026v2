@@ -11,6 +11,41 @@
 git rev-parse --show-toplevel >/dev/null || exit 1
 status=0
 seen=""
+user_java_home=$JAVA_HOME
+
+# Major version of the JDK at $1 from its release file, e.g. JAVA_VERSION="25.0.4.1" -> 25
+jdk_major() {
+    v=$(sed -n 's/^JAVA_VERSION="\([0-9._]*\)".*/\1/p' "$1/release" 2>/dev/null)
+    case "$v" in 1.*) v=${v#1.} ;; esac
+    echo "${v%%[._]*}"
+}
+
+# Prints the JAVA_HOME to build with for a project that needs JDK $1. Prints nothing when the java
+# already on PATH matches, and returns 1 when no matching JDK can be found.
+find_jdk() {
+    need=$1
+    if [ -z "$need" ]; then
+        echo "$user_java_home"
+        return 0
+    fi
+    if [ -n "$user_java_home" ] && [ "$(jdk_major "$user_java_home")" = "$need" ]; then
+        echo "$user_java_home"
+        return 0
+    fi
+    # Every WPILib install (2026, 2027_alpha7, 2027, ...) ships its own JDK
+    for jdk in "$HOME"/wpilib/*/jdk /c/Users/Public/wpilib/*/jdk; do
+        if [ -f "$jdk/release" ] && [ "$(jdk_major "$jdk")" = "$need" ]; then
+            echo "$jdk"
+            return 0
+        fi
+    done
+    path_version=$(java -version 2>&1 | sed -n 's/.*version "\([0-9._]*\)".*/\1/p')
+    case "$path_version" in 1.*) path_version=${path_version#1.} ;; esac
+    if [ -z "$user_java_home" ] && [ "${path_version%%[._]*}" = "$need" ]; then
+        return 0
+    fi
+    return 1
+}
 
 while read -r local_ref local_sha remote_ref remote_sha; do
     # Deleting a remote branch sends an all-zero sha, nothing to build
@@ -32,19 +67,18 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         break
     fi
 
-    # Use the WPILib JDK that matches this commit's GradleRIO year if JAVA_HOME isn't set
-    if [ -z "$JAVA_HOME" ]; then
-        year=$(sed -n 's/.*edu\.wpi\.first\.GradleRIO" version "\([0-9]*\).*/\1/p' "$tmp/build.gradle")
-        for jdk in "$HOME/wpilib/$year/jdk" "/c/Users/Public/wpilib/$year/jdk"; do
-            if [ -d "$jdk" ]; then
-                export JAVA_HOME="$jdk"
-                break
-            fi
-        done
+    # Build with a JDK matching this commit's sourceCompatibility (17 for 2026, 25 for 2027, ...)
+    need=$(sed -n -e 's/.*JavaVersion\.VERSION_\([0-9]*\).*/\1/p' \
+        -e 's/.*JavaLanguageVersion\.of(\([0-9]*\)).*/\1/p' "$tmp/build.gradle" | head -n 1)
+    if ! java_home=$(find_jdk "$need"); then
+        echo "pre-push: $short needs JDK $need. Install the matching WPILib or set JAVA_HOME to a JDK $need."
+        git worktree remove --force "$tmp"
+        status=1
+        break
     fi
 
     # </dev/null so gradle can't eat the ref list git sends on stdin
-    if (cd "$tmp" && ./gradlew build -PstrictCheckstyle --quiet </dev/null); then
+    if (cd "$tmp" && JAVA_HOME=$java_home ./gradlew build -PstrictCheckstyle --quiet </dev/null); then
         # compileJava runs spotlessApply, so a changed file means the commit wasn't formatted
         if [ -n "$(git -C "$tmp" status --porcelain --untracked-files=no)" ]; then
             echo "pre-push: $short isn't formatted. Run ./gradlew build, commit the changes and push again:"
