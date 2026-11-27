@@ -4,7 +4,7 @@
           "https://checkstyle.org/dtds/configuration_1_3.dtd">
 
 <!--
-    Checkstyle configuration that checks the Google coding conventions from Google Java Style
+    GRT checkstyle configuration, based on the Google coding conventions from Google Java Style
     that can be found at https://google.github.io/styleguide/javaguide.html
 
     Checkstyle is very configurable. Be sure to read the documentation at
@@ -20,7 +20,7 @@
 
   <property name="charset" value="UTF-8"/>
 
-  <property name="severity" value="${org.checkstyle.google.severity}" default="warning"/>
+  <property name="severity" value="error"/>
 
   <property name="fileExtensions" value="java, properties, xml"/>
   <!-- Excludes all 'module-info.java' files              -->
@@ -33,7 +33,7 @@
 
   <!-- https://checkstyle.org/filters/suppressionfilter.html -->
   <module name="SuppressionFilter">
-    <property name="file" value="${org.checkstyle.google.suppressionfilter.config}"
+    <property name="file" value="${org.checkstyle.grt.suppressionfilter.config}"
            default="checkstyle-suppressions.xml" />
     <property name="optional" value="true"/>
   </module>
@@ -409,7 +409,7 @@
     </module>
     <!-- https://checkstyle.org/filters/suppressionxpathfilter.html -->
     <module name="SuppressionXpathFilter">
-      <property name="file" value="${org.checkstyle.google.suppressionxpathfilter.config}"
+      <property name="file" value="${org.checkstyle.grt.suppressionxpathfilter.config}"
              default="checkstyle-xpath-suppressions.xml" />
       <property name="optional" value="true"/>
     </module>
