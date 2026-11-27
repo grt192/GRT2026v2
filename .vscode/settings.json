@@ -61,6 +61,6 @@
   "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable",
   "editor.tabSize": 4,
   "editor.formatOnSave": true,
-  "java.format.settings.url": "./eclipse-java-formatter.xml",
+  "java.format.settings.url": "./config/dev/eclipse_java_formatter_config.xml",
   "cSpell.words": ["Auton", "COEFF", "Configurator", "constantname", "periodics", "Quasistatic", "Setpoints", "TELEOP"]
 }
