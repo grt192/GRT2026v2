@@ -18,7 +18,7 @@ public class LoopOverrunTracker {
     private static final double OVERRUN_THRESHOLD_SECS = LoggedRobot.defaultPeriodSecs * 1.1;
 
     private static final String ALERT_PREFIX = "Robot Loop: ";
-    private static final Alert overrunAlert = new Alert(ALERT_PREFIX + "Overran", AlertType.kWarning);
+    private static final Alert OVERRUN_ALERT = new Alert(ALERT_PREFIX + "Overran", AlertType.kWarning);
 
     private static double lastCycleStartTime = -1.0;
     private static int overrunCount = 0;
@@ -45,9 +45,9 @@ public class LoopOverrunTracker {
         Logger.recordOutput("LoopOverrun/LastSlowestEpoch", slowestEpoch);
         Logger.recordOutput("LoopOverrun/LastSlowestEpochMS", LoggedTracer.getSlowestEpochMS());
 
-        overrunAlert.setText(String.format(
+        OVERRUN_ALERT.setText(String.format(
             "%sOverran %d times (last %.1f ms, slowest part %s)",
             ALERT_PREFIX, overrunCount, cycleSecs * 1000.0, slowestEpoch.isEmpty() ? "unknown" : slowestEpoch));
-        overrunAlert.set(true);
+        OVERRUN_ALERT.set(true);
     }
 }
