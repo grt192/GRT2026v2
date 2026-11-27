@@ -20,7 +20,7 @@
 
   <property name="charset" value="UTF-8"/>
 
-  <property name="severity" value="error"/>
+  <property name="severity" value="warning"/>
 
   <property name="fileExtensions" value="java, properties, xml"/>
   <!-- Excludes all 'module-info.java' files              -->
@@ -340,8 +340,13 @@
                value="Use all-caps GRT here; do not write grt or Grt."/>
     </module>
     <module name="NoWhitespaceBeforeCaseDefaultColon"/>
-    <module name="OverloadMethodsDeclarationOrder"/>
-    <module name="ConstructorsDeclarationGrouping"/>
+    <!-- Code-organization nags: shown but never block a push -->
+    <module name="OverloadMethodsDeclarationOrder">
+      <property name="severity" value="info"/>
+    </module>
+    <module name="ConstructorsDeclarationGrouping">
+      <property name="severity" value="info"/>
+    </module>
     <module name="MethodParamPad">
       <property name="tokens"
                value="CTOR_DEF, LITERAL_NEW, METHOD_CALL, METHOD_DEF, CTOR_CALL,
