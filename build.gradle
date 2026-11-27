@@ -100,7 +100,9 @@ test {
 }
 
 checkstyle {
-    toolVersion = "10.21.4"
+    // Checkstyle 13+ needs Java 21+ to run and is the first to parse Java 25 syntax. 2026 projects run
+    // Gradle on JDK 17, so they stay on 10.21.4.
+    toolVersion = JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21) ? "14.4.0" : "10.21.4"
     configFile = file("config/dev/checkstyle_config.xml")
     // Normal builds only print checkstyle warnings. The pre-push hook passes -PstrictCheckstyle so any
     // warning blocks the push.
