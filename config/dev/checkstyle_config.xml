@@ -241,34 +241,34 @@
              value="Type name {0} should be UpperCamelCase."/>
     </module>
     <module name="MemberName">
-      <property name="format" value="^[a-z](?:[a-zA-Z0-9]|(?&lt;=\d)_(?=\d))*$"/>
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
       <message key="name.invalidPattern"
-             value="Field name {0} should be lowerCamelCase, start with a lowercase letter, and use underscores only between two digits."/>
+             value="Field name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="ParameterName">
-      <property name="format" value="^[a-z](?:[a-zA-Z0-9]|(?&lt;=\d)_(?=\d))*$"/>
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
       <message key="name.invalidPattern"
-             value="Parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use underscores only between two digits."/>
+             value="Parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="LambdaParameterName">
-      <property name="format" value="^[a-z](?:[a-zA-Z0-9]|(?&lt;=\d)_(?=\d))*$"/>
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
       <message key="name.invalidPattern"
-             value="Lambda parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use underscores only between two digits."/>
+             value="Lambda parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="CatchParameterName">
-      <property name="format" value="^[a-z](?:[a-zA-Z0-9]|(?&lt;=\d)_(?=\d))*$"/>
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
       <message key="name.invalidPattern"
-             value="Catch parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use underscores only between two digits."/>
+             value="Catch parameter name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="LocalVariableName">
-      <property name="format" value="^[a-z](?:[a-zA-Z0-9]|(?&lt;=\d)_(?=\d))*$"/>
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
       <message key="name.invalidPattern"
-             value="Local variable name {0} should be lowerCamelCase, start with a lowercase letter, and use underscores only between two digits."/>
+             value="Local variable name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="PatternVariableName">
-      <property name="format" value="^[a-z](?:[a-zA-Z0-9]|(?&lt;=\d)_(?=\d))*$"/>
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
       <message key="name.invalidPattern"
-             value="Pattern variable name {0} should be lowerCamelCase, start with a lowercase letter, and use underscores only between two digits."/>
+             value="Pattern variable name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="ConstantName">
       <property name="format" value="^(?!K[A-Z]$)(?:[A-Z][A-Z0-9]*(_[A-Z0-9]+)*|k[A-Z])$"/>
@@ -281,9 +281,9 @@
              value="Class type parameter {0} should be a single uppercase letter, optionally followed by one digit, or an UpperCamelCase name ending in T."/>
     </module>
     <module name="RecordComponentName">
-      <property name="format" value="^[a-z](?:[a-zA-Z0-9]|(?&lt;=\d)_(?=\d))*$"/>
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
       <message key="name.invalidPattern"
-               value="Record component name {0} should be lowerCamelCase, start with a lowercase letter, and use underscores only between two digits."/>
+               value="Record component name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="RecordTypeParameterName">
       <property name="format" value="(^[A-Z][0-9]?)$|([A-Z][a-zA-Z0-9]*[T]$)"/>
@@ -391,9 +391,9 @@
       <property name="allowSamelineMultipleAnnotations" value="true"/>
     </module>
     <module name="MethodName">
-      <property name="format" value="^[a-z](?:[a-zA-Z0-9]|(?&lt;=\d)_(?=\d))*$"/>
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
       <message key="name.invalidPattern"
-             value="Method name {0} should be lowerCamelCase, start with a lowercase letter, and use underscores only between two digits."/>
+             value="Method name {0} should be lowerCamelCase, start with a lowercase letter, and use only letters or digits."/>
     </module>
     <module name="SuppressionXpathSingleFilter">
       <property name="checks" value="MethodName"/>
