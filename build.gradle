@@ -102,9 +102,6 @@ test {
 checkstyle {
     toolVersion = "10.21.4"
     configFile = file("config/dev/checkstyle_config.xml")
-    configProperties = [
-        "org.checkstyle.google.severity": "error",
-    ]
     maxWarnings = 0
 }
 
