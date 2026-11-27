@@ -102,15 +102,26 @@ test {
 checkstyle {
     toolVersion = "10.21.4"
     configFile = file("config/dev/checkstyle_config.xml")
-    maxWarnings = 0
+    // Normal builds only print checkstyle warnings. The pre-push hook passes -PstrictCheckstyle so any
+    // warning blocks the push.
+    maxWarnings = project.hasProperty("strictCheckstyle") ? 0 : Integer.MAX_VALUE
 }
+
+// Point git at config/dev/hooks so everyone gets the pre-push hook just by building
+tasks.register("installGitHooks", Exec) {
+    onlyIf { file(".git").exists() }
+    commandLine "git", "config", "core.hooksPath", "config/dev/hooks"
+    ignoreExitValue = true
+}
+compileJava.dependsOn installGitHooks
 
 tasks.withType(Checkstyle).configureEach {
     exclude "frc/robot/BuildConstants.java"
 
+    // Violations are printed in the console, no report files
     reports {
-        xml.required = true
-        html.required = true
+        xml.required = false
+        html.required = false
     }
 }
 

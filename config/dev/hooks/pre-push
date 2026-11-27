@@ -1,0 +1,65 @@
+#!/bin/sh
+# Pre-push hook: builds the exact commit you are pushing (not your working folder) in a temporary
+# checkout and cancels the push if the build, tests, checkstyle or formatting fail.
+#
+# Only the newest commit of each pushed branch is checked, so earlier commits in the same push can
+# be broken as long as the last one builds.
+#
+# Installed automatically by the installGitHooks task in build.gradle (sets core.hooksPath).
+# Emergency skip: git push --no-verify
+
+git rev-parse --show-toplevel >/dev/null || exit 1
+status=0
+seen=""
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Deleting a remote branch sends an all-zero sha, nothing to build
+    case "$local_sha" in
+        *[!0]*) ;;
+        *) continue ;;
+    esac
+    # Pushing several branches that point at the same commit only needs one build
+    case " $seen " in
+        *" $local_sha "*) continue ;;
+    esac
+    seen="$seen $local_sha"
+
+    short=$(git rev-parse --short "$local_sha")
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/pre-push.XXXXXX")
+    echo "pre-push: building $short ($local_ref) in a clean checkout..."
+    if ! git worktree add --quiet --detach "$tmp" "$local_sha"; then
+        status=1
+        break
+    fi
+
+    # Use the WPILib JDK that matches this commit's GradleRIO year if JAVA_HOME isn't set
+    if [ -z "$JAVA_HOME" ]; then
+        year=$(sed -n 's/.*edu\.wpi\.first\.GradleRIO" version "\([0-9]*\).*/\1/p' "$tmp/build.gradle")
+        for jdk in "$HOME/wpilib/$year/jdk" "/c/Users/Public/wpilib/$year/jdk"; do
+            if [ -d "$jdk" ]; then
+                export JAVA_HOME="$jdk"
+                break
+            fi
+        done
+    fi
+
+    # </dev/null so gradle can't eat the ref list git sends on stdin
+    if (cd "$tmp" && ./gradlew build -PstrictCheckstyle --quiet </dev/null); then
+        # compileJava runs spotlessApply, so a changed file means the commit wasn't formatted
+        if [ -n "$(git -C "$tmp" status --porcelain --untracked-files=no)" ]; then
+            echo "pre-push: $short isn't formatted. Run ./gradlew build, commit the changes and push again:"
+            git -C "$tmp" status --short --untracked-files=no
+            status=1
+        fi
+    else
+        echo "pre-push: build failed for $short, push cancelled (scroll up for the errors)."
+        status=1
+    fi
+
+    git worktree remove --force "$tmp"
+    if [ $status -ne 0 ]; then
+        break
+    fi
+done
+
+exit $status

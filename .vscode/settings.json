@@ -62,5 +62,7 @@
   "editor.tabSize": 4,
   "editor.formatOnSave": true,
   "java.format.settings.url": "./config/dev/eclipse_java_formatter_config.xml",
+  "java.checkstyle.configuration": "./config/dev/checkstyle_config.xml",
+  "java.checkstyle.version": "10.21.4",
   "cSpell.words": ["Auton", "COEFF", "Configurator", "constantname", "periodics", "Quasistatic", "Setpoints", "TELEOP"]
 }
